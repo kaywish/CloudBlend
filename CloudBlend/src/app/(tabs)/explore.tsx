@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons"
 import { router, useFocusEffect } from "expo-router"
 import { useCallback, useMemo, useState } from "react"
+import { useFlavors } from "@/context/FlavorContext"
 import {
   ActivityIndicator,
   FlatList,
@@ -21,6 +22,21 @@ import { useMixes } from "@/context/MixContext"
 type SortOption = "newest" | "popular"
 
 export default function ExploreScreen() {
+  const {
+  flavors,
+  brands,
+  topFlavors,
+  topBrands,
+  isLoading: isLoadingFlavors,
+  error: flavorError,
+} = useFlavors()
+
+console.log("Flavors:", flavors.length)
+console.log("Brands:", brands.length)
+console.log("Top flavors:", topFlavors)
+console.log("Top brands:", topBrands)
+console.log("Flavor loading:", isLoadingFlavors)
+console.log("Flavor error:", flavorError)
   const { theme } = useAppTheme()
   const styles = useMemo(() => getStyles(theme), [theme])
 

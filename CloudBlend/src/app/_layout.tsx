@@ -5,6 +5,7 @@ import { AuthProvider } from "@/context/AuthContext"
 import { AppThemeProvider, useAppTheme } from "@/context/AppThemeContext"
 import { MixProvider } from "@/context/MixContext"
 import { ProfileProvider } from "@/context/ProfileContext"
+import { FlavorProvider } from "@/context/FlavorContext"
 
 function AppNavigator() {
   const { theme, resolvedTheme } = useAppTheme()
@@ -36,14 +37,16 @@ function AppNavigator() {
 
 export default function RootLayout() {
   return (
-    <AppThemeProvider>
-      <AuthProvider>
-        <ProfileProvider>
-          <MixProvider>
-            <AppNavigator />
-          </MixProvider>
-        </ProfileProvider>
-      </AuthProvider>
-    </AppThemeProvider>
+  <AppThemeProvider>
+  <AuthProvider>
+    <ProfileProvider>
+      <MixProvider>
+        <FlavorProvider>
+          <Stack />
+        </FlavorProvider>
+      </MixProvider>
+    </ProfileProvider>
+  </AuthProvider>
+</AppThemeProvider>
   )
 }
