@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons"
 import { router, useLocalSearchParams } from "expo-router"
+import { useMemo } from "react"
 import {
   Image,
   ScrollView,
@@ -10,12 +11,13 @@ import {
 } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
 
-import { colors } from "@/constants/colors"
+import type { AppTheme } from "@/constants/colors"
+import { useAppTheme } from "@/context/AppThemeContext"
 import { flavors } from "@/data/flavors"
 
-const theme = colors.light
-
 export default function FlavorDetailScreen() {
+  const { theme } = useAppTheme()
+  const styles = useMemo(() => getStyles(theme), [theme])
   const { id } = useLocalSearchParams<{ id: string }>()
 
   const flavor = flavors.find((item) => item.id === id)
@@ -24,19 +26,35 @@ export default function FlavorDetailScreen() {
     return (
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.notFoundContainer}>
-          <Ionicons
-            name="alert-circle-outline"
-            size={50}
-            color={theme.primary}
-          />
+          <View style={styles.notFoundIcon}>
+            <Ionicons
+              name="alert-circle-outline"
+              size={42}
+              color={theme.primary}
+            />
+          </View>
 
-          <Text style={styles.notFoundTitle}>Flavor not found</Text>
+          <Text style={styles.notFoundTitle}>
+            Flavor not found
+          </Text>
+
+          <Text style={styles.notFoundText}>
+            This flavor may have been removed or is no longer available.
+          </Text>
 
           <TouchableOpacity
             style={styles.backButton}
             onPress={() => router.back()}
           >
-            <Text style={styles.backButtonText}>Go Back</Text>
+            <Ionicons
+              name="arrow-back"
+              size={18}
+              color="#FFFFFF"
+            />
+
+            <Text style={styles.backButtonText}>
+              Go Back
+            </Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -56,61 +74,158 @@ export default function FlavorDetailScreen() {
           >
             <Ionicons
               name="arrow-back"
-              size={23}
+              size={22}
               color={theme.text}
             />
           </TouchableOpacity>
 
-          <Text style={styles.headerTitle}>Flavor Details</Text>
+          <Text style={styles.headerTitle}>
+            Flavor Details
+          </Text>
 
           <TouchableOpacity style={styles.headerButton}>
             <Ionicons
               name="heart-outline"
-              size={24}
+              size={23}
               color={theme.text}
             />
           </TouchableOpacity>
         </View>
 
-        <Image source={{ uri: flavor.image }} style={styles.heroImage} />
+        <View style={styles.heroCard}>
+          <Image
+            source={{ uri: flavor.image }}
+            style={styles.heroImage}
+          />
+
+          <View style={styles.heroOverlay} />
+
+          <View style={styles.heroTopRow}>
+            <View style={styles.heroBadge}>
+              <Ionicons
+                name="sparkles-outline"
+                size={14}
+                color="#FFFFFF"
+              />
+
+              <Text style={styles.heroBadgeText}>
+                Flavor Profile
+              </Text>
+            </View>
+
+            <View style={styles.ratingPill}>
+              <Ionicons
+                name="star"
+                size={14}
+                color={theme.warning}
+              />
+
+              <Text style={styles.ratingPillText}>
+                {flavor.averageRating.toFixed(1)}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.heroBottom}>
+            <Text style={styles.flavorName}>
+              {flavor.name}
+            </Text>
+
+            <Text style={styles.brandName}>
+              {flavor.brand}
+            </Text>
+          </View>
+        </View>
 
         <View style={styles.content}>
-          <Text style={styles.flavorName}>{flavor.name}</Text>
-          <Text style={styles.brandName}>{flavor.brand}</Text>
-
           <View style={styles.tagContainer}>
             {flavor.categories.map((category) => (
               <View key={category} style={styles.categoryTag}>
-                <Text style={styles.categoryTagText}>{category}</Text>
+                <Text style={styles.categoryTagText}>
+                  {category}
+                </Text>
               </View>
             ))}
           </View>
 
-          <Text style={styles.description}>{flavor.description}</Text>
+          <View style={styles.descriptionCard}>
+            <View style={styles.descriptionIcon}>
+              <Ionicons
+                name="leaf-outline"
+                size={20}
+                color={theme.primary}
+              />
+            </View>
+
+            <Text style={styles.description}>
+              {flavor.description}
+            </Text>
+          </View>
+
+          <View style={styles.sectionHeader}>
+            <View>
+              <Text style={styles.sectionEyebrow}>
+                FLAVOR PROFILE
+              </Text>
+
+              <Text style={styles.sectionTitle}>
+                Taste Characteristics
+              </Text>
+            </View>
+          </View>
 
           <View style={styles.attributeCard}>
             <AttributeRow
               label="Sweetness"
               value={flavor.sweetness}
+              icon="ice-cream-outline"
+              theme={theme}
+              styles={styles}
             />
 
             <AttributeRow
               label="Mint Level"
               value={flavor.mintLevel}
+              icon="leaf-outline"
+              theme={theme}
+              styles={styles}
             />
 
             <AttributeRow
               label="Strength"
               value={flavor.strength}
+              icon="flame-outline"
+              theme={theme}
+              styles={styles}
             />
           </View>
 
-          <View style={styles.ratingCard}>
-            <Text style={styles.ratingLarge}>
-              {flavor.averageRating.toFixed(1)}
-            </Text>
-
+          <View style={styles.sectionHeader}>
             <View>
+              <Text style={styles.sectionEyebrow}>
+                COMMUNITY
+              </Text>
+
+              <Text style={styles.sectionTitle}>
+                Ratings
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.ratingCard}>
+            <View style={styles.ratingScoreWrap}>
+              <Text style={styles.ratingLarge}>
+                {flavor.averageRating.toFixed(1)}
+              </Text>
+
+              <Text style={styles.ratingOutOf}>
+                out of 5
+              </Text>
+            </View>
+
+            <View style={styles.ratingDivider} />
+
+            <View style={styles.ratingDetails}>
               <View style={styles.starsRow}>
                 {[1, 2, 3, 4, 5].map((star) => (
                   <Ionicons
@@ -127,33 +242,57 @@ export default function FlavorDetailScreen() {
               </View>
 
               <Text style={styles.ratingLabel}>
-                {flavor.ratingCount} community ratings
+                Based on {flavor.ratingCount} community{" "}
+                {flavor.ratingCount === 1
+                  ? "rating"
+                  : "ratings"}
               </Text>
             </View>
           </View>
 
-          <Text style={styles.sectionTitle}>Works Well With</Text>
+          <View style={styles.sectionHeader}>
+            <View>
+              <Text style={styles.sectionEyebrow}>
+                PAIRINGS
+              </Text>
+
+              <Text style={styles.sectionTitle}>
+                Works Well With
+              </Text>
+            </View>
+          </View>
 
           <View style={styles.pairingContainer}>
             {getPairings(flavor.id).map((pairing) => (
               <TouchableOpacity
                 key={pairing.name}
                 style={styles.pairingCard}
+                activeOpacity={0.82}
               >
                 <View style={styles.pairingIcon}>
                   <Ionicons
                     name={pairing.icon}
-                    size={23}
+                    size={22}
                     color={theme.primary}
                   />
                 </View>
 
-                <Text style={styles.pairingText}>{pairing.name}</Text>
+                <Text style={styles.pairingText}>
+                  {pairing.name}
+                </Text>
               </TouchableOpacity>
             ))}
           </View>
 
           <TouchableOpacity style={styles.primaryButton}>
+            <View style={styles.primaryButtonIcon}>
+              <Ionicons
+                name="flask-outline"
+                size={19}
+                color="#FFFFFF"
+              />
+            </View>
+
             <Text style={styles.primaryButtonText}>
               View Recommended Mixes
             </Text>
@@ -173,25 +312,52 @@ export default function FlavorDetailScreen() {
 type AttributeRowProps = {
   label: string
   value: number
+  icon: keyof typeof Ionicons.glyphMap
+  theme: AppTheme
+  styles: ReturnType<typeof getStyles>
 }
 
-function AttributeRow({ label, value }: AttributeRowProps) {
+function AttributeRow({
+  label,
+  value,
+  icon,
+  theme,
+  styles,
+}: AttributeRowProps) {
   return (
     <View style={styles.attributeRow}>
-      <Text style={styles.attributeLabel}>{label}</Text>
+      <View style={styles.attributeTopRow}>
+        <View style={styles.attributeLabelWrap}>
+          <View style={styles.attributeIcon}>
+            <Ionicons
+              name={icon}
+              size={17}
+              color={theme.primary}
+            />
+          </View>
+
+          <Text style={styles.attributeLabel}>
+            {label}
+          </Text>
+        </View>
+
+        <View style={styles.attributeValueBadge}>
+          <Text style={styles.attributeValue}>
+            {value}/10
+          </Text>
+        </View>
+      </View>
 
       <View style={styles.progressTrack}>
         <View
           style={[
             styles.progressFill,
             {
-              width: `${value * 10}%`,
+              width: `${Math.min(Math.max(value, 0), 10) * 10}%`,
             },
           ]}
         />
       </View>
-
-      <Text style={styles.attributeValue}>{value}/10</Text>
     </View>
   )
 }
@@ -268,242 +434,422 @@ function getPairings(flavorId: string) {
   return pairingMap[flavorId] ?? defaultPairings
 }
 
-const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: theme.background,
-  },
+function getStyles(theme: AppTheme) {
+  return StyleSheet.create({
+    safeArea: {
+      flex: 1,
+      backgroundColor: theme.background,
+    },
 
-  scrollContent: {
-    paddingBottom: 35,
-  },
+    scrollContent: {
+      paddingBottom: 36,
+    },
 
-  header: {
-    height: 58,
-    paddingHorizontal: 16,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
+    header: {
+      height: 58,
+      paddingHorizontal: 16,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+    },
 
-  headerButton: {
-    width: 42,
-    height: 42,
-    alignItems: "center",
-    justifyContent: "center",
-  },
+    headerButton: {
+      width: 42,
+      height: 42,
+      alignItems: "center",
+      justifyContent: "center",
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 14,
+      backgroundColor: theme.card,
+    },
 
-  headerTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: theme.text,
-  },
+    headerTitle: {
+      fontSize: 16,
+      fontWeight: "800",
+      color: theme.text,
+    },
 
-  heroImage: {
-    height: 290,
-    marginHorizontal: 20,
-    borderRadius: 22,
-    backgroundColor: theme.surface,
-  },
+    heroCard: {
+      height: 330,
+      marginHorizontal: 18,
+      overflow: "hidden",
+      borderRadius: 28,
+      backgroundColor: theme.surface,
+    },
 
-  content: {
-    paddingHorizontal: 20,
-    paddingTop: 22,
-  },
+    heroImage: {
+      width: "100%",
+      height: "100%",
+    },
 
-  flavorName: {
-    fontSize: 28,
-    fontWeight: "800",
-    letterSpacing: -0.5,
-    color: theme.text,
-  },
+    heroOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: "rgba(19,15,12,0.38)",
+    },
 
-  brandName: {
-    marginTop: 5,
-    fontSize: 14,
-    color: theme.textSecondary,
-  },
+    heroTopRow: {
+      position: "absolute",
+      top: 16,
+      left: 16,
+      right: 16,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+    },
 
-  tagContainer: {
-    marginTop: 15,
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
+    heroBadge: {
+      paddingHorizontal: 11,
+      paddingVertical: 7,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      borderRadius: 18,
+      backgroundColor: "rgba(255,255,255,0.17)",
+    },
 
-  categoryTag: {
-    paddingHorizontal: 11,
-    paddingVertical: 7,
-    borderRadius: 14,
-    backgroundColor: theme.primaryLight,
-  },
+    heroBadgeText: {
+      fontSize: 11,
+      fontWeight: "800",
+      color: "#FFFFFF",
+    },
 
-  categoryTagText: {
-    fontSize: 11,
-    fontWeight: "600",
-    color: theme.primaryDark,
-  },
+    ratingPill: {
+      paddingHorizontal: 10,
+      paddingVertical: 7,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 5,
+      borderRadius: 16,
+      backgroundColor: "rgba(19,15,12,0.76)",
+    },
 
-  description: {
-    marginTop: 20,
-    fontSize: 15,
-    lineHeight: 23,
-    color: theme.textSecondary,
-  },
+    ratingPillText: {
+      fontSize: 12,
+      fontWeight: "900",
+      color: "#FFFFFF",
+    },
 
-  attributeCard: {
-    marginTop: 22,
-    padding: 17,
-    gap: 18,
-    borderWidth: 1,
-    borderColor: theme.border,
-    borderRadius: 18,
-    backgroundColor: theme.card,
-  },
+    heroBottom: {
+      position: "absolute",
+      left: 20,
+      right: 20,
+      bottom: 20,
+    },
 
-  attributeRow: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
+    flavorName: {
+      fontSize: 31,
+      lineHeight: 37,
+      fontWeight: "900",
+      letterSpacing: -0.8,
+      color: "#FFFFFF",
+    },
 
-  attributeLabel: {
-    width: 82,
-    fontSize: 13,
-    fontWeight: "600",
-    color: theme.text,
-  },
+    brandName: {
+      marginTop: 5,
+      fontSize: 14,
+      fontWeight: "700",
+      color: "rgba(255,255,255,0.78)",
+    },
 
-  progressTrack: {
-    flex: 1,
-    height: 6,
-    overflow: "hidden",
-    borderRadius: 3,
-    backgroundColor: theme.divider,
-  },
+    content: {
+      paddingHorizontal: 18,
+      paddingTop: 18,
+    },
 
-  progressFill: {
-    height: "100%",
-    borderRadius: 3,
-    backgroundColor: theme.primary,
-  },
+    tagContainer: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 8,
+    },
 
-  attributeValue: {
-    width: 45,
-    textAlign: "right",
-    fontSize: 12,
-    color: theme.textSecondary,
-  },
+    categoryTag: {
+      paddingHorizontal: 11,
+      paddingVertical: 7,
+      borderRadius: 14,
+      backgroundColor: theme.primaryLight,
+    },
 
-  ratingCard: {
-    marginTop: 16,
-    padding: 20,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 18,
-    borderWidth: 1,
-    borderColor: theme.border,
-    borderRadius: 18,
-    backgroundColor: theme.card,
-  },
+    categoryTagText: {
+      fontSize: 11,
+      fontWeight: "800",
+      color: theme.primaryDark,
+    },
 
-  ratingLarge: {
-    fontSize: 43,
-    fontWeight: "800",
-    color: theme.text,
-  },
+    descriptionCard: {
+      marginTop: 16,
+      padding: 16,
+      flexDirection: "row",
+      alignItems: "flex-start",
+      gap: 12,
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 20,
+      backgroundColor: theme.card,
+    },
 
-  starsRow: {
-    flexDirection: "row",
-    gap: 2,
-  },
+    descriptionIcon: {
+      width: 40,
+      height: 40,
+      alignItems: "center",
+      justifyContent: "center",
+      borderRadius: 13,
+      backgroundColor: theme.primaryLight,
+    },
 
-  ratingLabel: {
-    marginTop: 5,
-    fontSize: 12,
-    color: theme.textSecondary,
-  },
+    description: {
+      flex: 1,
+      fontSize: 14,
+      lineHeight: 22,
+      color: theme.textSecondary,
+    },
 
-  sectionTitle: {
-    marginTop: 27,
-    marginBottom: 14,
-    fontSize: 18,
-    fontWeight: "700",
-    color: theme.text,
-  },
+    sectionHeader: {
+      marginTop: 28,
+      marginBottom: 14,
+    },
 
-  pairingContainer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: 8,
-  },
+    sectionEyebrow: {
+      fontSize: 10,
+      fontWeight: "800",
+      letterSpacing: 1.3,
+      color: theme.primary,
+    },
 
-  pairingCard: {
-    flex: 1,
-    alignItems: "center",
-  },
+    sectionTitle: {
+      marginTop: 4,
+      fontSize: 20,
+      fontWeight: "900",
+      color: theme.text,
+    },
 
-  pairingIcon: {
-    width: 55,
-    height: 55,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderColor: theme.border,
-    borderRadius: 28,
-    backgroundColor: theme.primaryLight,
-  },
+    attributeCard: {
+      padding: 17,
+      gap: 18,
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 22,
+      backgroundColor: theme.card,
+    },
 
-  pairingText: {
-    marginTop: 8,
-    fontSize: 11,
-    textAlign: "center",
-    color: theme.text,
-  },
+    attributeRow: {
+      gap: 10,
+    },
 
-  primaryButton: {
-    height: 56,
-    marginTop: 30,
-    paddingHorizontal: 20,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 9,
-    borderRadius: 16,
-    backgroundColor: theme.primary,
-  },
+    attributeTopRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+    },
 
-  primaryButtonText: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: "#FFFFFF",
-  },
+    attributeLabelWrap: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 9,
+    },
 
-  notFoundContainer: {
-    flex: 1,
-    padding: 25,
-    alignItems: "center",
-    justifyContent: "center",
-  },
+    attributeIcon: {
+      width: 34,
+      height: 34,
+      alignItems: "center",
+      justifyContent: "center",
+      borderRadius: 11,
+      backgroundColor: theme.primaryLight,
+    },
 
-  notFoundTitle: {
-    marginTop: 15,
-    fontSize: 21,
-    fontWeight: "700",
-    color: theme.text,
-  },
+    attributeLabel: {
+      fontSize: 13,
+      fontWeight: "800",
+      color: theme.text,
+    },
 
-  backButton: {
-    marginTop: 22,
-    paddingHorizontal: 22,
-    paddingVertical: 13,
-    borderRadius: 14,
-    backgroundColor: theme.primary,
-  },
+    attributeValueBadge: {
+      minWidth: 48,
+      paddingHorizontal: 9,
+      paddingVertical: 5,
+      alignItems: "center",
+      borderRadius: 11,
+      backgroundColor: theme.surface,
+    },
 
-  backButtonText: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: "#FFFFFF",
-  },
-})
+    attributeValue: {
+      fontSize: 11,
+      fontWeight: "800",
+      color: theme.textSecondary,
+    },
+
+    progressTrack: {
+      height: 7,
+      overflow: "hidden",
+      borderRadius: 4,
+      backgroundColor: theme.divider,
+    },
+
+    progressFill: {
+      height: "100%",
+      borderRadius: 4,
+      backgroundColor: theme.primary,
+    },
+
+    ratingCard: {
+      padding: 20,
+      flexDirection: "row",
+      alignItems: "center",
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 22,
+      backgroundColor: theme.card,
+    },
+
+    ratingScoreWrap: {
+      alignItems: "center",
+    },
+
+    ratingLarge: {
+      fontSize: 43,
+      fontWeight: "900",
+      letterSpacing: -1,
+      color: theme.text,
+    },
+
+    ratingOutOf: {
+      marginTop: -3,
+      fontSize: 10,
+      fontWeight: "700",
+      color: theme.textSecondary,
+    },
+
+    ratingDivider: {
+      width: 1,
+      height: 55,
+      marginHorizontal: 20,
+      backgroundColor: theme.border,
+    },
+
+    ratingDetails: {
+      flex: 1,
+    },
+
+    starsRow: {
+      flexDirection: "row",
+      gap: 3,
+    },
+
+    ratingLabel: {
+      marginTop: 7,
+      fontSize: 12,
+      lineHeight: 18,
+      color: theme.textSecondary,
+    },
+
+    pairingContainer: {
+      flexDirection: "row",
+      gap: 9,
+    },
+
+    pairingCard: {
+      flex: 1,
+      paddingVertical: 14,
+      alignItems: "center",
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 18,
+      backgroundColor: theme.card,
+    },
+
+    pairingIcon: {
+      width: 48,
+      height: 48,
+      alignItems: "center",
+      justifyContent: "center",
+      borderRadius: 16,
+      backgroundColor: theme.primaryLight,
+    },
+
+    pairingText: {
+      marginTop: 8,
+      fontSize: 11,
+      fontWeight: "700",
+      textAlign: "center",
+      color: theme.text,
+    },
+
+    primaryButton: {
+      height: 58,
+      marginTop: 30,
+      paddingHorizontal: 18,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 9,
+      borderRadius: 17,
+      backgroundColor: theme.primary,
+    },
+
+    primaryButtonIcon: {
+      width: 30,
+      height: 30,
+      alignItems: "center",
+      justifyContent: "center",
+      borderRadius: 10,
+      backgroundColor: "rgba(255,255,255,0.15)",
+    },
+
+    primaryButtonText: {
+      flex: 1,
+      fontSize: 14,
+      fontWeight: "800",
+      textAlign: "center",
+      color: "#FFFFFF",
+    },
+
+    notFoundContainer: {
+      flex: 1,
+      padding: 28,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+
+    notFoundIcon: {
+      width: 82,
+      height: 82,
+      alignItems: "center",
+      justifyContent: "center",
+      borderRadius: 28,
+      backgroundColor: theme.primaryLight,
+    },
+
+    notFoundTitle: {
+      marginTop: 20,
+      fontSize: 21,
+      fontWeight: "900",
+      color: theme.text,
+    },
+
+    notFoundText: {
+      marginTop: 8,
+      maxWidth: 290,
+      fontSize: 14,
+      lineHeight: 21,
+      textAlign: "center",
+      color: theme.textSecondary,
+    },
+
+    backButton: {
+      marginTop: 22,
+      paddingHorizontal: 20,
+      paddingVertical: 13,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 7,
+      borderRadius: 14,
+      backgroundColor: theme.primary,
+    },
+
+    backButtonText: {
+      fontSize: 14,
+      fontWeight: "800",
+      color: "#FFFFFF",
+    },
+  })
+}

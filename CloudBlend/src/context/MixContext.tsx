@@ -28,9 +28,13 @@ export type SavedMix = {
   name: string
   notes: string
   visibility: MixVisibility
+  sourceMixId?: string | null
+  recipeKey?: string | null
   ingredients: SavedMixIngredient[]
   likeCount: number
   likedByMe: boolean
+  creatorUsername?: string
+  creatorAvatarUrl?: string | null
   createdAt: string
   updatedAt: string
 }
@@ -40,6 +44,7 @@ type NewMix = {
   notes: string
   ingredients: SavedMixIngredient[]
   visibility?: MixVisibility
+  sourceMixId?: string | null
 }
 
 type MixUpdates = Partial<{
@@ -57,13 +62,18 @@ type MixContextValue = {
 
   saveMix: (mix: NewMix) => Promise<SavedMix>
   deleteMix: (mixId: string) => Promise<void>
-  updateMix: (mixId: string, updates: MixUpdates) => Promise<void>
+  updateMix: (
+    mixId: string,
+    updates: MixUpdates
+  ) => Promise<void>
   setMixVisibility: (
     mixId: string,
     visibility: MixVisibility
   ) => Promise<void>
 
-  getMixById: (mixId: string) => SavedMix | undefined
+  getMixById: (
+    mixId: string
+  ) => SavedMix | undefined
   refreshMixes: () => Promise<void>
   refreshPublicMixes: () => Promise<void>
   clearMixes: () => Promise<void>
@@ -73,12 +83,20 @@ type MixContextValue = {
   toggleLike: (mixId: string) => Promise<void>
 }
 
+type ProfileRow = {
+  id: string
+  username: string | null
+  avatar_url: string | null
+}
+
 type MixRow = {
   id: string
   user_id: string
   name: string
   notes: string | null
   visibility: MixVisibility
+  source_mix_id: string | null
+  recipe_key: string | null
   created_at: string
   updated_at: string
   mix_ingredients?: MixIngredientRow[] | null
@@ -104,7 +122,14 @@ type MixFilter = {
   visibility?: MixVisibility
 }
 
-const MixContext = createContext<MixContextValue | undefined>(undefined)
+type MixProviderProps = {
+  children: ReactNode
+}
+
+const MixContext =
+  createContext<MixContextValue | undefined>(
+    undefined
+  )
 
 const MIX_SELECT = `
   id,
@@ -112,6 +137,8 @@ const MIX_SELECT = `
   name,
   notes,
   visibility,
+  source_mix_id,
+  recipe_key,
   created_at,
   updated_at,
   mix_ingredients (
@@ -128,8 +155,34 @@ const MIX_SELECT = `
   )
 `
 
-type MixProviderProps = {
-  children: ReactNode
+function buildRecipeKey(
+  ingredients: SavedMixIngredient[]
+): string {
+  const combined = new Map<string, number>()
+
+  for (const ingredient of ingredients) {
+    const flavorId = ingredient.flavorId
+      .trim()
+      .toLowerCase()
+
+    combined.set(
+      flavorId,
+      (combined.get(flavorId) ?? 0) +
+        Number(ingredient.percentage)
+    )
+  }
+
+  return [...combined.entries()]
+    .sort(([firstId], [secondId]) =>
+      firstId.localeCompare(secondId)
+    )
+    .map(([flavorId, percentage]) => {
+      const normalizedPercentage =
+        Math.round(percentage * 100) / 100
+
+      return `${flavorId}:${normalizedPercentage}`
+    })
+    .join("|")
 }
 
 function mapIngredientRow(
@@ -147,7 +200,8 @@ function mapIngredientRow(
 
 function mapMixRow(
   row: MixRow,
-  currentUserId?: string
+  currentUserId?: string,
+  profile?: ProfileRow
 ): SavedMix {
   const likes = row.mix_likes ?? []
 
@@ -157,12 +211,24 @@ function mapMixRow(
     name: row.name,
     notes: row.notes ?? "",
     visibility: row.visibility,
-    ingredients: (row.mix_ingredients ?? []).map(mapIngredientRow),
+    sourceMixId: row.source_mix_id,
+    recipeKey: row.recipe_key,
+    ingredients: (row.mix_ingredients ?? []).map(
+      mapIngredientRow
+    ),
     likeCount: likes.length,
     likedByMe: Boolean(
       currentUserId &&
-        likes.some((like) => like.user_id === currentUserId)
+        likes.some(
+          (like) =>
+            like.user_id === currentUserId
+        )
     ),
+    creatorUsername:
+      profile?.username?.trim() ||
+      "CloudBlend user",
+    creatorAvatarUrl:
+      profile?.avatar_url ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }
@@ -182,6 +248,88 @@ function buildIngredientRows(
   }))
 }
 
+function getFriendlyDatabaseError(
+  error: { code?: string; message?: string }
+): Error {
+  if (error.code === "23505") {
+    return new Error(
+      "This exact recipe has already been published."
+    )
+  }
+
+  if (error.code === "23514") {
+    return new Error(
+      "Saved community mixes must remain private."
+    )
+  }
+
+  return new Error(
+    error.message ||
+      "Something went wrong while saving the mix."
+  )
+}
+
+async function fetchCreatorProfiles(
+  userIds: string[]
+): Promise<Map<string, ProfileRow>> {
+  const uniqueUserIds = [
+    ...new Set(userIds.filter(Boolean)),
+  ]
+
+  const profilesById = new Map<
+    string,
+    ProfileRow
+  >()
+
+  if (uniqueUserIds.length === 0) {
+    return profilesById
+  }
+
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id, username, avatar_url")
+    .in("id", uniqueUserIds)
+
+  if (error) {
+    console.error(
+      "Failed to fetch mix creator profiles:",
+      error
+    )
+
+    return profilesById
+  }
+
+  for (const profile of (data ??
+    []) as ProfileRow[]) {
+    profilesById.set(profile.id, profile)
+  }
+
+  return profilesById
+}
+
+async function fetchCreatorProfile(
+  userId: string
+): Promise<ProfileRow | undefined> {
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id, username, avatar_url")
+    .eq("id", userId)
+    .maybeSingle()
+
+  if (error) {
+    console.error(
+      "Failed to load mix creator profile:",
+      error
+    )
+
+    return undefined
+  }
+
+  return (
+    (data as ProfileRow | null) ?? undefined
+  )
+}
+
 async function fetchMixes(
   filter: MixFilter,
   currentUserId?: string
@@ -189,34 +337,70 @@ async function fetchMixes(
   let query = supabase
     .from("mixes")
     .select(MIX_SELECT)
-    .order("updated_at", { ascending: false })
+    .order("updated_at", {
+      ascending: false,
+    })
 
   if (filter.userId) {
-    query = query.eq("user_id", filter.userId)
+    query = query.eq(
+      "user_id",
+      filter.userId
+    )
   }
 
   if (filter.visibility) {
-    query = query.eq("visibility", filter.visibility)
+    query = query.eq(
+      "visibility",
+      filter.visibility
+    )
   }
 
   const { data, error } = await query
 
   if (error) {
+    console.error(
+      "Failed to fetch mixes:",
+      error
+    )
     throw error
   }
 
-  return (data ?? []).map((row) =>
-    mapMixRow(row as MixRow, currentUserId)
+  const mixRows = (data ??
+    []) as unknown as MixRow[]
+
+  if (mixRows.length === 0) {
+    return []
+  }
+
+  const profilesById =
+    await fetchCreatorProfiles(
+      mixRows.map((row) => row.user_id)
+    )
+
+  return mixRows.map((row) =>
+    mapMixRow(
+      row,
+      currentUserId,
+      profilesById.get(row.user_id)
+    )
   )
 }
 
-export function MixProvider({ children }: MixProviderProps) {
+export function MixProvider({
+  children,
+}: MixProviderProps) {
   const { user } = useAuth()
 
-  const [savedMixes, setSavedMixes] = useState<SavedMix[]>([])
-  const [publicMixes, setPublicMixes] = useState<SavedMix[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [isLoadingPublic, setIsLoadingPublic] = useState(false)
+  const [savedMixes, setSavedMixes] =
+    useState<SavedMix[]>([])
+  const [publicMixes, setPublicMixes] =
+    useState<SavedMix[]>([])
+  const [isLoading, setIsLoading] =
+    useState(true)
+  const [
+    isLoadingPublic,
+    setIsLoadingPublic,
+  ] = useState(false)
 
   const refreshMixes = useCallback(async () => {
     if (!user) {
@@ -228,10 +412,17 @@ export function MixProvider({ children }: MixProviderProps) {
     setIsLoading(true)
 
     try {
-      const mixes = await fetchMixes({ userId: user.id }, user.id)
+      const mixes = await fetchMixes(
+        { userId: user.id },
+        user.id
+      )
+
       setSavedMixes(mixes)
     } catch (error) {
-      console.error("Failed to load saved mixes:", error)
+      console.error(
+        "Failed to load saved mixes:",
+        error
+      )
       setSavedMixes([])
       throw error
     } finally {
@@ -239,45 +430,67 @@ export function MixProvider({ children }: MixProviderProps) {
     }
   }, [user])
 
-  const refreshPublicMixes = useCallback(async () => {
-    setIsLoadingPublic(true)
+  const refreshPublicMixes =
+    useCallback(async () => {
+      setIsLoadingPublic(true)
 
-    try {
-      const mixes = await fetchMixes(
-        { visibility: "public" },
-        user?.id
-      )
-      setPublicMixes(mixes)
-    } catch (error) {
-      console.error("Failed to load public mixes:", error)
-      setPublicMixes([])
-      throw error
-    } finally {
-      setIsLoadingPublic(false)
-    }
-  }, [user?.id])
+      try {
+        const mixes = await fetchMixes(
+          { visibility: "public" },
+          user?.id
+        )
+
+        setPublicMixes(mixes)
+      } catch (error) {
+        console.error(
+          "Failed to load public mixes:",
+          error
+        )
+        setPublicMixes([])
+        throw error
+      } finally {
+        setIsLoadingPublic(false)
+      }
+    }, [user?.id])
 
   useEffect(() => {
     refreshMixes().catch(() => {
-      // Error is already logged in refreshMixes.
+      // Already logged.
     })
   }, [refreshMixes])
 
   const saveMix = useCallback(
-    async (mix: NewMix): Promise<SavedMix> => {
+    async (
+      mix: NewMix
+    ): Promise<SavedMix> => {
       if (!user) {
-        throw new Error("You must be signed in to save a mix.")
+        throw new Error(
+          "You must be signed in to save a mix."
+        )
       }
 
-      const visibility = mix.visibility ?? "private"
+      const recipeKey = buildRecipeKey(
+        mix.ingredients
+      )
 
-      const { data: insertedMix, error: mixError } = await supabase
+      const visibility: MixVisibility =
+        mix.sourceMixId
+          ? "private"
+          : mix.visibility ?? "private"
+
+      const {
+        data: insertedMix,
+        error: mixError,
+      } = await supabase
         .from("mixes")
         .insert({
           user_id: user.id,
           name: mix.name.trim(),
           notes: mix.notes.trim(),
           visibility,
+          source_mix_id:
+            mix.sourceMixId ?? null,
+          recipe_key: recipeKey,
         })
         .select(`
           id,
@@ -285,21 +498,35 @@ export function MixProvider({ children }: MixProviderProps) {
           name,
           notes,
           visibility,
+          source_mix_id,
+          recipe_key,
           created_at,
           updated_at
         `)
         .single()
 
       if (mixError) {
-        console.error("Failed to create mix:", mixError)
-        throw mixError
+        console.error(
+          "Failed to create mix:",
+          mixError
+        )
+        throw getFriendlyDatabaseError(
+          mixError
+        )
       }
 
       try {
         if (mix.ingredients.length > 0) {
-          const { error: ingredientError } = await supabase
+          const {
+            error: ingredientError,
+          } = await supabase
             .from("mix_ingredients")
-            .insert(buildIngredientRows(insertedMix.id, mix.ingredients))
+            .insert(
+              buildIngredientRows(
+                insertedMix.id,
+                mix.ingredients
+              )
+            )
 
           if (ingredientError) {
             throw ingredientError
@@ -312,33 +539,62 @@ export function MixProvider({ children }: MixProviderProps) {
           .eq("id", insertedMix.id)
           .eq("user_id", user.id)
 
-        console.error("Failed to save mix ingredients:", error)
+        console.error(
+          "Failed to save mix ingredients:",
+          error
+        )
+
         throw error
       }
+
+      const creatorProfile =
+        await fetchCreatorProfile(user.id)
 
       const newMix: SavedMix = {
         id: insertedMix.id,
         userId: insertedMix.user_id,
         name: insertedMix.name,
         notes: insertedMix.notes ?? "",
-        visibility: insertedMix.visibility,
+        visibility:
+          insertedMix.visibility,
+        sourceMixId:
+          insertedMix.source_mix_id,
+        recipeKey:
+          insertedMix.recipe_key,
         ingredients: mix.ingredients,
         likeCount: 0,
         likedByMe: false,
-        createdAt: insertedMix.created_at,
-        updatedAt: insertedMix.updated_at,
+        creatorUsername:
+          creatorProfile?.username?.trim() ||
+          "CloudBlend user",
+        creatorAvatarUrl:
+          creatorProfile?.avatar_url ?? null,
+        createdAt:
+          insertedMix.created_at,
+        updatedAt:
+          insertedMix.updated_at,
       }
 
       setSavedMixes((currentMixes) => [
         newMix,
-        ...currentMixes.filter((savedMix) => savedMix.id !== newMix.id),
+        ...currentMixes.filter(
+          (savedMix) =>
+            savedMix.id !== newMix.id
+        ),
       ])
 
-      if (newMix.visibility === "public") {
-        setPublicMixes((currentMixes) => [
-          newMix,
-          ...currentMixes.filter((publicMix) => publicMix.id !== newMix.id),
-        ])
+      if (
+        newMix.visibility === "public"
+      ) {
+        setPublicMixes(
+          (currentMixes) => [
+            newMix,
+            ...currentMixes.filter(
+              (publicMix) =>
+                publicMix.id !== newMix.id
+            ),
+          ]
+        )
       }
 
       return newMix
@@ -347,9 +603,13 @@ export function MixProvider({ children }: MixProviderProps) {
   )
 
   const deleteMix = useCallback(
-    async (mixId: string): Promise<void> => {
+    async (
+      mixId: string
+    ): Promise<void> => {
       if (!user) {
-        throw new Error("You must be signed in to delete a mix.")
+        throw new Error(
+          "You must be signed in to delete a mix."
+        )
       }
 
       const { error } = await supabase
@@ -359,44 +619,99 @@ export function MixProvider({ children }: MixProviderProps) {
         .eq("user_id", user.id)
 
       if (error) {
-        console.error("Failed to delete mix:", error)
+        console.error(
+          "Failed to delete mix:",
+          error
+        )
         throw error
       }
 
       setSavedMixes((currentMixes) =>
-        currentMixes.filter((mix) => mix.id !== mixId)
+        currentMixes.filter(
+          (mix) => mix.id !== mixId
+        )
       )
 
       setPublicMixes((currentMixes) =>
-        currentMixes.filter((mix) => mix.id !== mixId)
+        currentMixes.filter(
+          (mix) => mix.id !== mixId
+        )
       )
     },
     [user]
   )
 
   const updateMix = useCallback(
-    async (mixId: string, updates: MixUpdates): Promise<void> => {
+    async (
+      mixId: string,
+      updates: MixUpdates
+    ): Promise<void> => {
       if (!user) {
-        throw new Error("You must be signed in to update a mix.")
+        throw new Error(
+          "You must be signed in to update a mix."
+        )
       }
 
-      const mixChanges: Record<string, unknown> = {
-        updated_at: new Date().toISOString(),
+      const currentMix =
+        savedMixes.find(
+          (mix) => mix.id === mixId
+        ) ??
+        publicMixes.find(
+          (mix) => mix.id === mixId
+        )
+
+      if (!currentMix) {
+        throw new Error(
+          "Mix not found. Refresh your mixes and try again."
+        )
+      }
+
+      if (
+        updates.visibility === "public" &&
+        currentMix.sourceMixId
+      ) {
+        throw new Error(
+          "Saved community mixes cannot be published."
+        )
+      }
+
+      const finalIngredients =
+        updates.ingredients ??
+        currentMix.ingredients
+
+      const mixChanges: Record<
+        string,
+        unknown
+      > = {
+        updated_at:
+          new Date().toISOString(),
+        recipe_key:
+          buildRecipeKey(
+            finalIngredients
+          ),
       }
 
       if (updates.name !== undefined) {
-        mixChanges.name = updates.name.trim()
+        mixChanges.name =
+          updates.name.trim()
       }
 
       if (updates.notes !== undefined) {
-        mixChanges.notes = updates.notes.trim()
+        mixChanges.notes =
+          updates.notes.trim()
       }
 
-      if (updates.visibility !== undefined) {
-        mixChanges.visibility = updates.visibility
+      if (
+        updates.visibility !== undefined
+      ) {
+        mixChanges.visibility =
+          updates.visibility
       }
 
-      const { data: updatedMixRow, error: mixError } = await supabase
+      const {
+        data: updatedMixRow,
+        error: mixError,
+      } = await supabase
         .from("mixes")
         .update(mixChanges)
         .eq("id", mixId)
@@ -407,18 +722,29 @@ export function MixProvider({ children }: MixProviderProps) {
           name,
           notes,
           visibility,
+          source_mix_id,
+          recipe_key,
           created_at,
           updated_at
         `)
         .single()
 
       if (mixError) {
-        console.error("Failed to update mix:", mixError)
-        throw mixError
+        console.error(
+          "Failed to update mix:",
+          mixError
+        )
+        throw getFriendlyDatabaseError(
+          mixError
+        )
       }
 
-      if (updates.ingredients !== undefined) {
-        const { error: deleteIngredientsError } = await supabase
+      if (
+        updates.ingredients !== undefined
+      ) {
+        const {
+          error: deleteIngredientsError,
+        } = await supabase
           .from("mix_ingredients")
           .delete()
           .eq("mix_id", mixId)
@@ -431,12 +757,24 @@ export function MixProvider({ children }: MixProviderProps) {
           throw deleteIngredientsError
         }
 
-        if (updates.ingredients.length > 0) {
-          const { error: insertIngredientsError } = await supabase
+        if (
+          updates.ingredients.length > 0
+        ) {
+          const {
+            error:
+              insertIngredientsError,
+          } = await supabase
             .from("mix_ingredients")
-            .insert(buildIngredientRows(mixId, updates.ingredients))
+            .insert(
+              buildIngredientRows(
+                mixId,
+                updates.ingredients
+              )
+            )
 
-          if (insertIngredientsError) {
+          if (
+            insertIngredientsError
+          ) {
             console.error(
               "Failed to insert updated ingredients:",
               insertIngredientsError
@@ -446,102 +784,140 @@ export function MixProvider({ children }: MixProviderProps) {
         }
       }
 
-      let updatedLocalMix: SavedMix | undefined
+      const updatedLocalMix: SavedMix = {
+        ...currentMix,
+        name: updatedMixRow.name,
+        notes:
+          updatedMixRow.notes ?? "",
+        visibility:
+          updatedMixRow.visibility,
+        sourceMixId:
+          updatedMixRow.source_mix_id,
+        recipeKey:
+          updatedMixRow.recipe_key,
+        ingredients: finalIngredients,
+        updatedAt:
+          updatedMixRow.updated_at,
+      }
 
-      setSavedMixes((currentMixes) =>
-        currentMixes.map((mix) => {
-          if (mix.id !== mixId) {
-            return mix
-          }
-
-          updatedLocalMix = {
-            ...mix,
-            name: updatedMixRow.name,
-            notes: updatedMixRow.notes ?? "",
-            visibility: updatedMixRow.visibility,
-            ingredients: updates.ingredients ?? mix.ingredients,
-            updatedAt: updatedMixRow.updated_at,
-          }
-
-          return updatedLocalMix
-        })
-      )
-
-      setPublicMixes((currentMixes) => {
-        const existingMix =
-          updatedLocalMix ?? currentMixes.find((mix) => mix.id === mixId)
-
-        const withoutUpdatedMix = currentMixes.filter(
-          (mix) => mix.id !== mixId
+      setSavedMixes((currentMixes) => {
+        const exists = currentMixes.some(
+          (mix) => mix.id === mixId
         )
 
-        if (!existingMix || updatedMixRow.visibility === "private") {
-          return withoutUpdatedMix
+        if (!exists) {
+          return [
+            updatedLocalMix,
+            ...currentMixes,
+          ]
         }
 
-        const publicVersion: SavedMix = {
-          ...existingMix,
-          name: updatedMixRow.name,
-          notes: updatedMixRow.notes ?? "",
-          visibility: updatedMixRow.visibility,
-          ingredients: updates.ingredients ?? existingMix.ingredients,
-          updatedAt: updatedMixRow.updated_at,
-        }
-
-        return [publicVersion, ...withoutUpdatedMix]
+        return currentMixes.map((mix) =>
+          mix.id === mixId
+            ? updatedLocalMix
+            : mix
+        )
       })
+
+      setPublicMixes(
+        (currentMixes) => {
+          const withoutUpdatedMix =
+            currentMixes.filter(
+              (mix) =>
+                mix.id !== mixId
+            )
+
+          if (
+            updatedLocalMix.visibility ===
+            "private"
+          ) {
+            return withoutUpdatedMix
+          }
+
+          return [
+            updatedLocalMix,
+            ...withoutUpdatedMix,
+          ]
+        }
+      )
     },
-    [user]
+    [
+      user,
+      savedMixes,
+      publicMixes,
+    ]
   )
 
-  const setMixVisibility = useCallback(
-    async (
-      mixId: string,
-      visibility: MixVisibility
-    ): Promise<void> => {
-      await updateMix(mixId, { visibility })
-    },
-    [updateMix]
-  )
+  const setMixVisibility =
+    useCallback(
+      async (
+        mixId: string,
+        visibility: MixVisibility
+      ): Promise<void> => {
+        await updateMix(mixId, {
+          visibility,
+        })
+      },
+      [updateMix]
+    )
 
   const getMixById = useCallback(
-    (mixId: string): SavedMix | undefined => {
+    (
+      mixId: string
+    ): SavedMix | undefined => {
       return (
-        savedMixes.find((mix) => mix.id === mixId) ??
-        publicMixes.find((mix) => mix.id === mixId)
+        savedMixes.find(
+          (mix) => mix.id === mixId
+        ) ??
+        publicMixes.find(
+          (mix) => mix.id === mixId
+        )
       )
     },
     [publicMixes, savedMixes]
   )
 
-  const clearMixes = useCallback(async (): Promise<void> => {
-    if (!user) {
+  const clearMixes =
+    useCallback(async (): Promise<void> => {
+      if (!user) {
+        setSavedMixes([])
+        return
+      }
+
+      const mixIds = savedMixes.map(
+        (mix) => mix.id
+      )
+
+      if (mixIds.length === 0) {
+        setSavedMixes([])
+        return
+      }
+
+      const { error } = await supabase
+        .from("mixes")
+        .delete()
+        .eq("user_id", user.id)
+
+      if (error) {
+        console.error(
+          "Failed to clear mixes:",
+          error
+        )
+        throw error
+      }
+
       setSavedMixes([])
-      return
-    }
 
-    const mixIds = savedMixes.map((mix) => mix.id)
-
-    if (mixIds.length === 0) {
-      setSavedMixes([])
-      return
-    }
-
-    const { error } = await supabase
-      .from("mixes")
-      .delete()
-      .eq("user_id", user.id)
-
-    if (error) {
-      console.error("Failed to clear mixes:", error)
-      throw error
-    }
-
-    setSavedMixes([])
-    setPublicMixes((currentMixes) =>
-      currentMixes.filter((mix) => !mixIds.includes(mix.id))
-    )
-  }, [savedMixes, user])
+      setPublicMixes(
+        (currentMixes) =>
+          currentMixes.filter(
+            (mix) =>
+              !mixIds.includes(
+                mix.id
+              )
+          )
+      )
+    }, [savedMixes, user])
 
   const updateLikeState = useCallback(
     (
@@ -549,7 +925,9 @@ export function MixProvider({ children }: MixProviderProps) {
       likedByMe: boolean,
       likeCountChange: number
     ) => {
-      const updateMixLike = (mix: SavedMix): SavedMix => {
+      const updateMixLike = (
+        mix: SavedMix
+      ): SavedMix => {
         if (mix.id !== mixId) {
           return mix
         }
@@ -557,36 +935,60 @@ export function MixProvider({ children }: MixProviderProps) {
         return {
           ...mix,
           likedByMe,
-          likeCount: Math.max(0, mix.likeCount + likeCountChange),
+          likeCount: Math.max(
+            0,
+            mix.likeCount +
+              likeCountChange
+          ),
         }
       }
 
-      setSavedMixes((currentMixes) =>
-        currentMixes.map(updateMixLike)
+      setSavedMixes(
+        (currentMixes) =>
+          currentMixes.map(
+            updateMixLike
+          )
       )
 
-      setPublicMixes((currentMixes) =>
-        currentMixes.map(updateMixLike)
+      setPublicMixes(
+        (currentMixes) =>
+          currentMixes.map(
+            updateMixLike
+          )
       )
     },
     []
   )
 
   const likeMix = useCallback(
-    async (mixId: string): Promise<void> => {
+    async (
+      mixId: string
+    ): Promise<void> => {
       if (!user) {
-        throw new Error("You must be signed in to like a mix.")
+        throw new Error(
+          "You must be signed in to like a mix."
+        )
       }
 
       const currentMix =
-        savedMixes.find((mix) => mix.id === mixId) ??
-        publicMixes.find((mix) => mix.id === mixId)
+        savedMixes.find(
+          (mix) => mix.id === mixId
+        ) ??
+        publicMixes.find(
+          (mix) => mix.id === mixId
+        )
 
-      if (currentMix?.likedByMe) {
+      if (
+        currentMix?.likedByMe
+      ) {
         return
       }
 
-      updateLikeState(mixId, true, 1)
+      updateLikeState(
+        mixId,
+        true,
+        1
+      )
 
       const { error } = await supabase
         .from("mix_likes")
@@ -596,17 +998,27 @@ export function MixProvider({ children }: MixProviderProps) {
         })
 
       if (error) {
-        updateLikeState(mixId, false, -1)
+        updateLikeState(
+          mixId,
+          false,
+          -1
+        )
 
-        if (error.code === "23505") {
+        if (
+          error.code === "23505"
+        ) {
           await Promise.all([
             refreshMixes(),
             refreshPublicMixes(),
           ])
+
           return
         }
 
-        console.error("Failed to like mix:", error)
+        console.error(
+          "Failed to like mix:",
+          error
+        )
         throw error
       }
     },
@@ -621,20 +1033,35 @@ export function MixProvider({ children }: MixProviderProps) {
   )
 
   const unlikeMix = useCallback(
-    async (mixId: string): Promise<void> => {
+    async (
+      mixId: string
+    ): Promise<void> => {
       if (!user) {
-        throw new Error("You must be signed in to unlike a mix.")
+        throw new Error(
+          "You must be signed in to unlike a mix."
+        )
       }
 
       const currentMix =
-        savedMixes.find((mix) => mix.id === mixId) ??
-        publicMixes.find((mix) => mix.id === mixId)
+        savedMixes.find(
+          (mix) => mix.id === mixId
+        ) ??
+        publicMixes.find(
+          (mix) => mix.id === mixId
+        )
 
-      if (currentMix && !currentMix.likedByMe) {
+      if (
+        currentMix &&
+        !currentMix.likedByMe
+      ) {
         return
       }
 
-      updateLikeState(mixId, false, -1)
+      updateLikeState(
+        mixId,
+        false,
+        -1
+      )
 
       const { error } = await supabase
         .from("mix_likes")
@@ -643,8 +1070,15 @@ export function MixProvider({ children }: MixProviderProps) {
         .eq("user_id", user.id)
 
       if (error) {
-        updateLikeState(mixId, true, 1)
-        console.error("Failed to unlike mix:", error)
+        updateLikeState(
+          mixId,
+          true,
+          1
+        )
+        console.error(
+          "Failed to unlike mix:",
+          error
+        )
         throw error
       }
     },
@@ -657,17 +1091,29 @@ export function MixProvider({ children }: MixProviderProps) {
   )
 
   const toggleLike = useCallback(
-    async (mixId: string): Promise<void> => {
+    async (
+      mixId: string
+    ): Promise<void> => {
       if (!user) {
-        throw new Error("You must be signed in to like a mix.")
+        throw new Error(
+          "You must be signed in to like a mix."
+        )
       }
 
       const mix =
-        savedMixes.find((savedMix) => savedMix.id === mixId) ??
-        publicMixes.find((publicMix) => publicMix.id === mixId)
+        savedMixes.find(
+          (savedMix) =>
+            savedMix.id === mixId
+        ) ??
+        publicMixes.find(
+          (publicMix) =>
+            publicMix.id === mixId
+        )
 
       if (!mix) {
-        throw new Error("Mix not found.")
+        throw new Error(
+          "Mix not found."
+        )
       }
 
       if (mix.likedByMe) {
@@ -677,45 +1123,52 @@ export function MixProvider({ children }: MixProviderProps) {
 
       await likeMix(mixId)
     },
-    [likeMix, publicMixes, savedMixes, unlikeMix, user]
-  )
-
-  const value = useMemo<MixContextValue>(
-    () => ({
-      savedMixes,
-      publicMixes,
-      isLoading,
-      isLoadingPublic,
-      saveMix,
-      deleteMix,
-      updateMix,
-      setMixVisibility,
-      getMixById,
-      refreshMixes,
-      refreshPublicMixes,
-      clearMixes,
-      likeMix,
-      unlikeMix,
-      toggleLike,
-    }),
     [
-      savedMixes,
-      publicMixes,
-      isLoading,
-      isLoadingPublic,
-      saveMix,
-      deleteMix,
-      updateMix,
-      setMixVisibility,
-      getMixById,
-      refreshMixes,
-      refreshPublicMixes,
-      clearMixes,
       likeMix,
+      publicMixes,
+      savedMixes,
       unlikeMix,
-      toggleLike,
+      user,
     ]
   )
+
+  const value =
+    useMemo<MixContextValue>(
+      () => ({
+        savedMixes,
+        publicMixes,
+        isLoading,
+        isLoadingPublic,
+        saveMix,
+        deleteMix,
+        updateMix,
+        setMixVisibility,
+        getMixById,
+        refreshMixes,
+        refreshPublicMixes,
+        clearMixes,
+        likeMix,
+        unlikeMix,
+        toggleLike,
+      }),
+      [
+        savedMixes,
+        publicMixes,
+        isLoading,
+        isLoadingPublic,
+        saveMix,
+        deleteMix,
+        updateMix,
+        setMixVisibility,
+        getMixById,
+        refreshMixes,
+        refreshPublicMixes,
+        clearMixes,
+        likeMix,
+        unlikeMix,
+        toggleLike,
+      ]
+    )
 
   return (
     <MixContext.Provider value={value}>
@@ -725,10 +1178,13 @@ export function MixProvider({ children }: MixProviderProps) {
 }
 
 export function useMixes() {
-  const context = useContext(MixContext)
+  const context =
+    useContext(MixContext)
 
   if (!context) {
-    throw new Error("useMixes must be used inside a MixProvider")
+    throw new Error(
+      "useMixes must be used inside a MixProvider"
+    )
   }
 
   return context

@@ -1,5 +1,7 @@
 export const colors = {
   light: {
+    isDark: false,
+
     background: "#FFFFFF",
     surface: "#F8F5F2",
     card: "#FFFFFF",
@@ -8,6 +10,7 @@ export const colors = {
     primary: "#D86B2B",
     primaryDark: "#A9471D",
     primaryLight: "#F7E1D4",
+    primarySoft: "#F7E1D4",
 
     brown: "#4B2B20",
     brownDark: "#281712",
@@ -19,6 +22,7 @@ export const colors = {
 
     border: "#ECE6E2",
     divider: "#F0EBE7",
+    input: "#F8F5F2",
 
     success: "#5B9A58",
     warning: "#F0A51A",
@@ -29,6 +33,8 @@ export const colors = {
   },
 
   dark: {
+    isDark: true,
+
     background: "#130F0C",
     surface: "#1D1713",
     card: "#271E19",
@@ -37,6 +43,7 @@ export const colors = {
     primary: "#E17B43",
     primaryDark: "#B95225",
     primaryLight: "#4C2A1D",
+    primarySoft: "#4C2A1D",
 
     brown: "#D8B4A3",
     brownDark: "#0D0907",
@@ -48,6 +55,7 @@ export const colors = {
 
     border: "#3B2D26",
     divider: "#322720",
+    input: "#1D1713",
 
     success: "#79B975",
     warning: "#F4B640",

@@ -12,11 +12,10 @@ import {
 } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
 
-import { colors } from "@/constants/colors"
+import type { AppTheme } from "@/constants/colors"
+import { useAppTheme } from "@/context/AppThemeContext"
 import { flavors } from "@/data/flavors"
 import { Flavor, FlavorCategory } from "@/types"
-
-const theme = colors.light
 
 const categories: Array<FlavorCategory | "All"> = [
   "All",
@@ -28,7 +27,23 @@ const categories: Array<FlavorCategory | "All"> = [
   "Spiced",
 ]
 
+const categoryIcons: Record<
+  FlavorCategory | "All",
+  keyof typeof Ionicons.glyphMap
+> = {
+  All: "grid-outline",
+  Fruity: "nutrition-outline",
+  Minty: "leaf-outline",
+  Sweet: "ice-cream-outline",
+  Citrus: "sunny-outline",
+  Creamy: "water-outline",
+  Spiced: "flame-outline",
+}
+
 export default function FlavorsScreen() {
+  const { theme } = useAppTheme()
+  const styles = useMemo(() => getStyles(theme), [theme])
+
   const [search, setSearch] = useState("")
   const [selectedCategory, setSelectedCategory] = useState<
     FlavorCategory | "All"
@@ -63,123 +78,197 @@ export default function FlavorsScreen() {
     })
   }
 
+  function clearFilters() {
+    setSearch("")
+    setSelectedCategory("All")
+  }
+
   return (
     <SafeAreaView style={styles.safeArea} edges={["top"]}>
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.title}>Flavors</Text>
-          <Text style={styles.subtitle}>
-            Find flavors that match your taste.
-          </Text>
-        </View>
-
-        <TouchableOpacity style={styles.filterButton}>
-          <Ionicons
-            name="options-outline"
-            size={23}
-            color={theme.primary}
-          />
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.searchContainer}>
-        <Ionicons
-          name="search-outline"
-          size={20}
-          color={theme.textSecondary}
-        />
-
-        <TextInput
-          value={search}
-          onChangeText={setSearch}
-          style={styles.searchInput}
-          placeholder="Search flavors or brands..."
-          placeholderTextColor={theme.muted}
-          autoCapitalize="none"
-          autoCorrect={false}
-        />
-
-        {search.length > 0 ? (
-          <TouchableOpacity onPress={() => setSearch("")}>
-            <Ionicons
-              name="close-circle"
-              size={20}
-              color={theme.muted}
-            />
-          </TouchableOpacity>
-        ) : null}
-      </View>
-
-      <FlatList
-        horizontal
-        data={categories}
-        keyExtractor={(item) => item}
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.categoryList}
-        style={styles.categoryScroll}
-        renderItem={({ item }) => {
-          const isSelected = item === selectedCategory
-
-          return (
-            <TouchableOpacity
-              onPress={() => setSelectedCategory(item)}
-              style={[
-                styles.categoryChip,
-                isSelected && styles.categoryChipSelected,
-              ]}
-            >
-              <Text
-                style={[
-                  styles.categoryChipText,
-                  isSelected && styles.categoryChipTextSelected,
-                ]}
-              >
-                {item}
-              </Text>
-            </TouchableOpacity>
-          )
-        }}
-      />
-
-      <View style={styles.resultsHeader}>
-        <Text style={styles.resultsTitle}>
-          {selectedCategory === "All"
-            ? "All Flavors"
-            : `${selectedCategory} Flavors`}
-        </Text>
-
-        <Text style={styles.resultsCount}>
-          {filteredFlavors.length}{" "}
-          {filteredFlavors.length === 1 ? "flavor" : "flavors"}
-        </Text>
-      </View>
-
       <FlatList
         data={filteredFlavors}
         keyExtractor={(item) => item.id}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[
-          styles.flavorList,
-          filteredFlavors.length === 0 && styles.emptyList,
+          styles.listContent,
+          filteredFlavors.length === 0 &&
+            styles.emptyListContent,
         ]}
+        ListHeaderComponent={
+          <>
+            <View style={styles.hero}>
+              <View style={styles.heroGlowOne} />
+              <View style={styles.heroGlowTwo} />
+
+              <View style={styles.heroTopRow}>
+                <View style={styles.heroIcon}>
+                  <Ionicons
+                    name="leaf"
+                    size={24}
+                    color="#FFFFFF"
+                  />
+                </View>
+
+                <View style={styles.heroCountBadge}>
+                  <Ionicons
+                    name="sparkles-outline"
+                    size={14}
+                    color="#FFFFFF"
+                  />
+                  <Text style={styles.heroCountText}>
+                    {flavors.length} flavors
+                  </Text>
+                </View>
+              </View>
+
+              <Text style={styles.heroTitle}>
+                Discover your next favorite flavor
+              </Text>
+
+              <Text style={styles.heroSubtitle}>
+                Browse the CloudBlend library and find the perfect
+                combination for your next mix.
+              </Text>
+            </View>
+
+            <View style={styles.searchCard}>
+              <View style={styles.searchContainer}>
+                <View style={styles.searchIcon}>
+                  <Ionicons
+                    name="search-outline"
+                    size={19}
+                    color={theme.primary}
+                  />
+                </View>
+
+                <TextInput
+                  value={search}
+                  onChangeText={setSearch}
+                  style={styles.searchInput}
+                  placeholder="Search flavors or brands"
+                  placeholderTextColor={theme.muted}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  returnKeyType="search"
+                />
+
+                {search.length > 0 ? (
+                  <TouchableOpacity
+                    style={styles.clearSearchButton}
+                    onPress={() => setSearch("")}
+                  >
+                    <Ionicons
+                      name="close"
+                      size={18}
+                      color={theme.textSecondary}
+                    />
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+
+              <FlatList
+                horizontal
+                data={categories}
+                keyExtractor={(item) => item}
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.categoryList}
+                style={styles.categoryScroll}
+                renderItem={({ item }) => {
+                  const isSelected =
+                    item === selectedCategory
+
+                  return (
+                    <TouchableOpacity
+                      onPress={() =>
+                        setSelectedCategory(item)
+                      }
+                      style={[
+                        styles.categoryChip,
+                        isSelected &&
+                          styles.categoryChipSelected,
+                      ]}
+                    >
+                      <Ionicons
+                        name={categoryIcons[item]}
+                        size={15}
+                        color={
+                          isSelected
+                            ? "#FFFFFF"
+                            : theme.textSecondary
+                        }
+                      />
+
+                      <Text
+                        style={[
+                          styles.categoryChipText,
+                          isSelected &&
+                            styles.categoryChipTextSelected,
+                        ]}
+                      >
+                        {item}
+                      </Text>
+                    </TouchableOpacity>
+                  )
+                }}
+              />
+            </View>
+
+            <View style={styles.resultsHeader}>
+              <View>
+                <Text style={styles.resultsEyebrow}>
+                  FLAVOR LIBRARY
+                </Text>
+
+                <Text style={styles.resultsTitle}>
+                  {selectedCategory === "All"
+                    ? "All Flavors"
+                    : `${selectedCategory} Flavors`}
+                </Text>
+              </View>
+
+              <View style={styles.resultsCountBadge}>
+                <Text style={styles.resultsCount}>
+                  {filteredFlavors.length}
+                </Text>
+              </View>
+            </View>
+          </>
+        }
         renderItem={({ item }) => (
-          <FlavorCard flavor={item} onPress={() => openFlavor(item)} />
+          <FlavorCard
+            flavor={item}
+            onPress={() => openFlavor(item)}
+            theme={theme}
+            styles={styles}
+          />
         )}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <View style={styles.emptyIcon}>
               <Ionicons
                 name="search-outline"
-                size={34}
+                size={36}
                 color={theme.primary}
               />
             </View>
 
-            <Text style={styles.emptyTitle}>No flavors found</Text>
+            <Text style={styles.emptyTitle}>
+              No flavors found
+            </Text>
 
             <Text style={styles.emptyText}>
-              Try a different search or category.
+              Try another search term or choose a different
+              category.
             </Text>
+
+            <TouchableOpacity
+              style={styles.resetButton}
+              onPress={clearFilters}
+            >
+              <Text style={styles.resetButtonText}>
+                Reset filters
+              </Text>
+            </TouchableOpacity>
           </View>
         }
       />
@@ -190,54 +279,85 @@ export default function FlavorsScreen() {
 type FlavorCardProps = {
   flavor: Flavor
   onPress: () => void
+  theme: AppTheme
+  styles: ReturnType<typeof getStyles>
 }
 
-function FlavorCard({ flavor, onPress }: FlavorCardProps) {
+function FlavorCard({
+  flavor,
+  onPress,
+  theme,
+  styles,
+}: FlavorCardProps) {
   return (
     <TouchableOpacity
       style={styles.flavorCard}
-      activeOpacity={0.85}
+      activeOpacity={0.86}
       onPress={onPress}
     >
-      <Image source={{ uri: flavor.image }} style={styles.flavorImage} />
+      <View style={styles.imageWrap}>
+        <Image
+          source={{ uri: flavor.image }}
+          style={styles.flavorImage}
+        />
+
+        <View style={styles.ratingPill}>
+          <Ionicons
+            name="star"
+            size={12}
+            color={theme.warning}
+          />
+
+          <Text style={styles.ratingValue}>
+            {flavor.averageRating.toFixed(1)}
+          </Text>
+        </View>
+      </View>
 
       <View style={styles.flavorContent}>
         <View style={styles.flavorTopRow}>
           <View style={styles.flavorTitleContainer}>
-            <Text style={styles.flavorName} numberOfLines={1}>
+            <Text
+              style={styles.flavorName}
+              numberOfLines={1}
+            >
               {flavor.name}
             </Text>
 
-            <Text style={styles.flavorBrand}>{flavor.brand}</Text>
+            <Text style={styles.flavorBrand}>
+              {flavor.brand}
+            </Text>
           </View>
 
-          <TouchableOpacity
-            style={styles.addButton}
-            onPress={(event) => {
-              event.stopPropagation()
-            }}
-          >
-            <Ionicons name="add" size={19} color="#FFFFFF" />
-          </TouchableOpacity>
+          <View style={styles.chevronButton}>
+            <Ionicons
+              name="chevron-forward"
+              size={18}
+              color={theme.primary}
+            />
+          </View>
         </View>
 
         <View style={styles.tagContainer}>
           {flavor.categories.slice(0, 3).map((category) => (
             <View key={category} style={styles.categoryTag}>
-              <Text style={styles.categoryTagText}>{category}</Text>
+              <Text style={styles.categoryTagText}>
+                {category}
+              </Text>
             </View>
           ))}
         </View>
 
-        <View style={styles.ratingRow}>
-          <Ionicons name="star" size={15} color={theme.warning} />
-
-          <Text style={styles.ratingValue}>
-            {flavor.averageRating.toFixed(1)}
+        <View style={styles.cardFooter}>
+          <Text style={styles.ratingCount}>
+            {flavor.ratingCount}{" "}
+            {flavor.ratingCount === 1
+              ? "rating"
+              : "ratings"}
           </Text>
 
-          <Text style={styles.ratingCount}>
-            ({flavor.ratingCount} ratings)
+          <Text style={styles.viewDetailsText}>
+            View details
           </Text>
         </View>
       </View>
@@ -245,247 +365,382 @@ function FlavorCard({ flavor, onPress }: FlavorCardProps) {
   )
 }
 
-const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: theme.background,
-  },
+function getStyles(theme: AppTheme) {
+  return StyleSheet.create({
+    safeArea: {
+      flex: 1,
+      backgroundColor: theme.background,
+    },
 
-  header: {
-    paddingHorizontal: 20,
-    paddingTop: 10,
-    paddingBottom: 18,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
+    listContent: {
+      paddingHorizontal: 18,
+      paddingBottom: 34,
+    },
 
-  title: {
-    fontSize: 30,
-    fontWeight: "800",
-    letterSpacing: -0.7,
-    color: theme.text,
-  },
+    emptyListContent: {
+      flexGrow: 1,
+    },
 
-  subtitle: {
-    marginTop: 4,
-    fontSize: 14,
-    color: theme.textSecondary,
-  },
+    hero: {
+      marginTop: 14,
+      marginBottom: 16,
+      padding: 22,
+      overflow: "hidden",
+      borderRadius: 28,
+      backgroundColor: theme.primary,
+    },
 
-  filterButton: {
-    width: 44,
-    height: 44,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderColor: theme.border,
-    borderRadius: 14,
-    backgroundColor: theme.surface,
-  },
+    heroGlowOne: {
+      position: "absolute",
+      top: -42,
+      right: -35,
+      width: 150,
+      height: 150,
+      borderRadius: 75,
+      backgroundColor: "rgba(255,255,255,0.12)",
+    },
 
-  searchContainer: {
-    height: 52,
-    marginHorizontal: 20,
-    paddingHorizontal: 15,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    borderWidth: 1,
-    borderColor: theme.border,
-    borderRadius: 15,
-    backgroundColor: theme.surface,
-  },
+    heroGlowTwo: {
+      position: "absolute",
+      bottom: -55,
+      left: -30,
+      width: 145,
+      height: 145,
+      borderRadius: 73,
+      backgroundColor: "rgba(255,255,255,0.07)",
+    },
 
-  searchInput: {
-    flex: 1,
-    height: "100%",
-    fontSize: 14,
-    color: theme.text,
-  },
+    heroTopRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+    },
 
-  categoryScroll: {
-    flexGrow: 0,
-    marginTop: 18,
-  },
+    heroIcon: {
+      width: 46,
+      height: 46,
+      alignItems: "center",
+      justifyContent: "center",
+      borderRadius: 15,
+      backgroundColor: "rgba(255,255,255,0.17)",
+    },
 
-  categoryList: {
-    paddingHorizontal: 20,
-    gap: 9,
-  },
+    heroCountBadge: {
+      paddingHorizontal: 11,
+      paddingVertical: 7,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      borderRadius: 20,
+      backgroundColor: "rgba(255,255,255,0.15)",
+    },
 
-  categoryChip: {
-    paddingHorizontal: 17,
-    paddingVertical: 10,
-    borderWidth: 1,
-    borderColor: theme.border,
-    borderRadius: 20,
-    backgroundColor: theme.background,
-  },
+    heroCountText: {
+      fontSize: 12,
+      fontWeight: "700",
+      color: "#FFFFFF",
+    },
 
-  categoryChipSelected: {
-    borderColor: theme.primary,
-    backgroundColor: theme.primary,
-  },
+    heroTitle: {
+      marginTop: 20,
+      maxWidth: 315,
+      fontSize: 28,
+      lineHeight: 34,
+      fontWeight: "900",
+      letterSpacing: -0.7,
+      color: "#FFFFFF",
+    },
 
-  categoryChipText: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: theme.textSecondary,
-  },
+    heroSubtitle: {
+      marginTop: 8,
+      maxWidth: 320,
+      fontSize: 14,
+      lineHeight: 21,
+      color: "rgba(255,255,255,0.82)",
+    },
 
-  categoryChipTextSelected: {
-    color: "#FFFFFF",
-  },
+    searchCard: {
+      paddingVertical: 14,
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 22,
+      backgroundColor: theme.card,
+    },
 
-  resultsHeader: {
-    marginTop: 22,
-    marginBottom: 12,
-    paddingHorizontal: 20,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
+    searchContainer: {
+      height: 54,
+      marginHorizontal: 14,
+      paddingHorizontal: 10,
+      flexDirection: "row",
+      alignItems: "center",
+      borderRadius: 16,
+      backgroundColor: theme.surface,
+    },
 
-  resultsTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: theme.text,
-  },
+    searchIcon: {
+      width: 36,
+      height: 36,
+      alignItems: "center",
+      justifyContent: "center",
+      borderRadius: 12,
+      backgroundColor: theme.primaryLight,
+    },
 
-  resultsCount: {
-    fontSize: 12,
-    color: theme.textSecondary,
-  },
+    searchInput: {
+      flex: 1,
+      height: "100%",
+      marginLeft: 10,
+      fontSize: 14,
+      color: theme.text,
+    },
 
-  flavorList: {
-    paddingHorizontal: 20,
-    paddingBottom: 30,
-    gap: 12,
-  },
+    clearSearchButton: {
+      width: 34,
+      height: 34,
+      alignItems: "center",
+      justifyContent: "center",
+      borderRadius: 12,
+      backgroundColor: theme.background,
+    },
 
-  flavorCard: {
-    minHeight: 125,
-    padding: 12,
-    flexDirection: "row",
-    borderWidth: 1,
-    borderColor: theme.border,
-    borderRadius: 18,
-    backgroundColor: theme.card,
-  },
+    categoryScroll: {
+      flexGrow: 0,
+      marginTop: 13,
+    },
 
-  flavorImage: {
-    width: 102,
-    height: 102,
-    borderRadius: 15,
-    backgroundColor: theme.surface,
-  },
+    categoryList: {
+      paddingHorizontal: 14,
+      gap: 8,
+    },
 
-  flavorContent: {
-    flex: 1,
-    marginLeft: 14,
-    justifyContent: "center",
-  },
+    categoryChip: {
+      paddingHorizontal: 14,
+      paddingVertical: 9,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 18,
+      backgroundColor: theme.background,
+    },
 
-  flavorTopRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-  },
+    categoryChipSelected: {
+      borderColor: theme.primary,
+      backgroundColor: theme.primary,
+    },
 
-  flavorTitleContainer: {
-    flex: 1,
-    paddingRight: 8,
-  },
+    categoryChipText: {
+      fontSize: 12,
+      fontWeight: "700",
+      color: theme.textSecondary,
+    },
 
-  flavorName: {
-    fontSize: 17,
-    fontWeight: "700",
-    color: theme.text,
-  },
+    categoryChipTextSelected: {
+      color: "#FFFFFF",
+    },
 
-  flavorBrand: {
-    marginTop: 3,
-    fontSize: 12,
-    color: theme.textSecondary,
-  },
+    resultsHeader: {
+      marginTop: 24,
+      marginBottom: 14,
+      paddingHorizontal: 2,
+      flexDirection: "row",
+      alignItems: "flex-end",
+      justifyContent: "space-between",
+    },
 
-  addButton: {
-    width: 31,
-    height: 31,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 16,
-    backgroundColor: theme.primary,
-  },
+    resultsEyebrow: {
+      fontSize: 10,
+      fontWeight: "800",
+      letterSpacing: 1.4,
+      color: theme.primary,
+    },
 
-  tagContainer: {
-    marginTop: 11,
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 6,
-  },
+    resultsTitle: {
+      marginTop: 4,
+      fontSize: 21,
+      fontWeight: "900",
+      color: theme.text,
+    },
 
-  categoryTag: {
-    paddingHorizontal: 9,
-    paddingVertical: 5,
-    borderRadius: 12,
-    backgroundColor: theme.primaryLight,
-  },
+    resultsCountBadge: {
+      minWidth: 42,
+      height: 32,
+      paddingHorizontal: 10,
+      alignItems: "center",
+      justifyContent: "center",
+      borderRadius: 12,
+      backgroundColor: theme.primaryLight,
+    },
 
-  categoryTagText: {
-    fontSize: 10,
-    fontWeight: "600",
-    color: theme.primaryDark,
-  },
+    resultsCount: {
+      fontSize: 13,
+      fontWeight: "900",
+      color: theme.primaryDark,
+    },
 
-  ratingRow: {
-    marginTop: 10,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
+    flavorCard: {
+      minHeight: 132,
+      marginBottom: 13,
+      padding: 11,
+      flexDirection: "row",
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 22,
+      backgroundColor: theme.card,
+    },
 
-  ratingValue: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: theme.text,
-  },
+    imageWrap: {
+      position: "relative",
+    },
 
-  ratingCount: {
-    fontSize: 11,
-    color: theme.textSecondary,
-  },
+    flavorImage: {
+      width: 106,
+      height: 110,
+      borderRadius: 17,
+      backgroundColor: theme.surface,
+    },
 
-  emptyList: {
-    flexGrow: 1,
-  },
+    ratingPill: {
+      position: "absolute",
+      left: 8,
+      bottom: 8,
+      paddingHorizontal: 7,
+      paddingVertical: 5,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 4,
+      borderRadius: 10,
+      backgroundColor: "rgba(19,15,12,0.78)",
+    },
 
-  emptyContainer: {
-    flex: 1,
-    paddingTop: 70,
-    alignItems: "center",
-  },
+    ratingValue: {
+      fontSize: 10,
+      fontWeight: "800",
+      color: "#FFFFFF",
+    },
 
-  emptyIcon: {
-    width: 72,
-    height: 72,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 36,
-    backgroundColor: theme.primaryLight,
-  },
+    flavorContent: {
+      flex: 1,
+      marginLeft: 14,
+      paddingVertical: 4,
+      justifyContent: "space-between",
+    },
 
-  emptyTitle: {
-    marginTop: 18,
-    fontSize: 18,
-    fontWeight: "700",
-    color: theme.text,
-  },
+    flavorTopRow: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      justifyContent: "space-between",
+    },
 
-  emptyText: {
-    marginTop: 6,
-    fontSize: 14,
-    color: theme.textSecondary,
-  },
-})
+    flavorTitleContainer: {
+      flex: 1,
+      paddingRight: 8,
+    },
+
+    flavorName: {
+      fontSize: 17,
+      fontWeight: "900",
+      color: theme.text,
+    },
+
+    flavorBrand: {
+      marginTop: 3,
+      fontSize: 12,
+      fontWeight: "600",
+      color: theme.textSecondary,
+    },
+
+    chevronButton: {
+      width: 34,
+      height: 34,
+      alignItems: "center",
+      justifyContent: "center",
+      borderRadius: 12,
+      backgroundColor: theme.primaryLight,
+    },
+
+    tagContainer: {
+      marginTop: 10,
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 6,
+    },
+
+    categoryTag: {
+      paddingHorizontal: 8,
+      paddingVertical: 5,
+      borderRadius: 10,
+      backgroundColor: theme.surface,
+    },
+
+    categoryTagText: {
+      fontSize: 10,
+      fontWeight: "700",
+      color: theme.textSecondary,
+    },
+
+    cardFooter: {
+      marginTop: 10,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+    },
+
+    ratingCount: {
+      fontSize: 10,
+      color: theme.muted,
+    },
+
+    viewDetailsText: {
+      fontSize: 11,
+      fontWeight: "800",
+      color: theme.primary,
+    },
+
+    emptyContainer: {
+      flex: 1,
+      paddingTop: 72,
+      paddingHorizontal: 28,
+      alignItems: "center",
+    },
+
+    emptyIcon: {
+      width: 78,
+      height: 78,
+      alignItems: "center",
+      justifyContent: "center",
+      borderRadius: 26,
+      backgroundColor: theme.primaryLight,
+    },
+
+    emptyTitle: {
+      marginTop: 20,
+      fontSize: 20,
+      fontWeight: "900",
+      color: theme.text,
+    },
+
+    emptyText: {
+      marginTop: 8,
+      fontSize: 14,
+      lineHeight: 21,
+      textAlign: "center",
+      color: theme.textSecondary,
+    },
+
+    resetButton: {
+      marginTop: 18,
+      paddingHorizontal: 18,
+      paddingVertical: 11,
+      borderRadius: 14,
+      backgroundColor: theme.primary,
+    },
+
+    resetButtonText: {
+      fontSize: 13,
+      fontWeight: "800",
+      color: "#FFFFFF",
+    },
+  })
+}

@@ -19,25 +19,10 @@ import {
 } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
 
-import { colors } from "@/constants/colors"
 import { useAuth } from "@/context/AuthContext"
+import { ThemeMode, useAppTheme } from "@/context/AppThemeContext"
 import { useMixes } from "@/context/MixContext"
 import { useProfile } from "@/context/ProfileContext"
-
-const theme = colors.light
-
-const palette = {
-  background: theme.background,
-  card: theme.card,
-  text: theme.text,
-  muted: theme.textSecondary,
-  border: theme.border,
-  primary: theme.primary,
-  primarySoft: `${theme.primary}18`,
-  success: "#20A66A",
-  warning: "#F59E0B",
-  danger: "#DC3545",
-}
 
 function getInitials(
   displayName?: string,
@@ -64,6 +49,30 @@ function formatJoinedDate(date?: string) {
 export default function ProfileScreen() {
   const { user, signOut } = useAuth()
   const {
+    theme,
+    themeMode,
+    resolvedTheme,
+    setThemeMode,
+  } = useAppTheme()
+
+  const palette = {
+    background: theme.background,
+    card: theme.card,
+    surface: theme.surface,
+    text: theme.text,
+    muted: theme.textSecondary,
+    border: theme.border,
+    input: theme.input,
+    primary: theme.primary,
+    primaryDark: theme.primaryDark,
+    primarySoft: theme.primarySoft,
+    success: theme.success,
+    warning: theme.warning,
+    danger: theme.danger,
+  }
+
+  const styles = getStyles(palette)
+  const {
     savedMixes,
     isLoading,
     refreshMixes,
@@ -81,6 +90,8 @@ export default function ProfileScreen() {
   const [isRefreshing, setIsRefreshing] =
     useState(false)
   const [editVisible, setEditVisible] =
+    useState(false)
+  const [appearanceVisible, setAppearanceVisible] =
     useState(false)
   const [username, setUsername] = useState("")
   const [displayName, setDisplayName] =
@@ -227,7 +238,38 @@ export default function ProfileScreen() {
     )
   }
 
+  async function performSignOut() {
+    const result = await signOut()
+
+    if (result.error) {
+      if (Platform.OS === "web") {
+        window.alert(result.error)
+      } else {
+        Alert.alert(
+          "Could Not Sign Out",
+          result.error
+        )
+      }
+
+      return
+    }
+
+    router.replace("/auth")
+  }
+
   function handleSignOut() {
+    if (Platform.OS === "web") {
+      const confirmed = window.confirm(
+        "Are you sure you want to sign out?"
+      )
+
+      if (confirmed) {
+        performSignOut()
+      }
+
+      return
+    }
+
     Alert.alert(
       "Sign Out",
       "Are you sure you want to sign out?",
@@ -239,22 +281,15 @@ export default function ProfileScreen() {
         {
           text: "Sign Out",
           style: "destructive",
-          onPress: async () => {
-            const result = await signOut()
-
-            if (result.error) {
-              Alert.alert(
-                "Could Not Sign Out",
-                result.error
-              )
-              return
-            }
-
-            router.replace("/auth")
-          },
+          onPress: performSignOut,
         },
       ]
     )
+  }
+
+  async function handleThemeChange(mode: ThemeMode) {
+    await setThemeMode(mode)
+    setAppearanceVisible(false)
   }
 
   if (!user) {
@@ -703,6 +738,50 @@ export default function ProfileScreen() {
 
         <View style={styles.accountSection}>
           <Text style={styles.sectionTitle}>
+            Appearance
+          </Text>
+
+          <View style={styles.accountCard}>
+            <TouchableOpacity
+              style={styles.accountRow}
+              onPress={() => setAppearanceVisible(true)}
+            >
+              <View style={styles.accountIcon}>
+                <Ionicons
+                  name={
+                    resolvedTheme === "dark"
+                      ? "moon-outline"
+                      : "sunny-outline"
+                  }
+                  size={20}
+                  color={palette.primary}
+                />
+              </View>
+
+              <View style={styles.accountText}>
+                <Text style={styles.accountLabel}>
+                  App Theme
+                </Text>
+                <Text style={styles.accountValue}>
+                  {themeMode === "system"
+                    ? `System (${resolvedTheme})`
+                    : themeMode === "dark"
+                    ? "Dark"
+                    : "Light"}
+                </Text>
+              </View>
+
+              <Ionicons
+                name="chevron-forward"
+                size={19}
+                color={palette.muted}
+              />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <View style={styles.accountSection}>
+          <Text style={styles.sectionTitle}>
             Account
           </Text>
 
@@ -765,6 +844,128 @@ export default function ProfileScreen() {
           </View>
         </View>
       </ScrollView>
+
+      <Modal
+        visible={appearanceVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setAppearanceVisible(false)}
+      >
+        <View style={styles.appearanceOverlay}>
+          <TouchableOpacity
+            style={StyleSheet.absoluteFill}
+            activeOpacity={1}
+            onPress={() => setAppearanceVisible(false)}
+          />
+
+          <View style={styles.appearanceSheet}>
+            <View style={styles.appearanceHandle} />
+
+            <Text style={styles.appearanceTitle}>
+              Appearance
+            </Text>
+
+            <Text style={styles.appearanceSubtitle}>
+              Choose how CloudBlend looks on this device.
+            </Text>
+
+            {(
+              [
+                {
+                  value: "system",
+                  label: "System",
+                  description:
+                    "Match your device appearance",
+                  icon: "phone-portrait-outline",
+                },
+                {
+                  value: "light",
+                  label: "Light",
+                  description:
+                    "Always use the light theme",
+                  icon: "sunny-outline",
+                },
+                {
+                  value: "dark",
+                  label: "Dark",
+                  description:
+                    "Always use the dark theme",
+                  icon: "moon-outline",
+                },
+              ] as const
+            ).map((option) => {
+              const selected =
+                themeMode === option.value
+
+              return (
+                <TouchableOpacity
+                  key={option.value}
+                  style={[
+                    styles.themeOption,
+                    selected &&
+                      styles.themeOptionSelected,
+                  ]}
+                  onPress={() =>
+                    handleThemeChange(option.value)
+                  }
+                >
+                  <View
+                    style={[
+                      styles.themeOptionIcon,
+                      selected &&
+                        styles.themeOptionIconSelected,
+                    ]}
+                  >
+                    <Ionicons
+                      name={option.icon}
+                      size={21}
+                      color={
+                        selected
+                          ? palette.primary
+                          : palette.muted
+                      }
+                    />
+                  </View>
+
+                  <View style={styles.themeOptionText}>
+                    <Text style={styles.themeOptionLabel}>
+                      {option.label}
+                    </Text>
+                    <Text
+                      style={
+                        styles.themeOptionDescription
+                      }
+                    >
+                      {option.description}
+                    </Text>
+                  </View>
+
+                  <View
+                    style={[
+                      styles.radioOuter,
+                      selected &&
+                        styles.radioOuterSelected,
+                    ]}
+                  >
+                    {selected ? (
+                      <View style={styles.radioInner} />
+                    ) : null}
+                  </View>
+                </TouchableOpacity>
+              )
+            })}
+
+            <TouchableOpacity
+              style={styles.appearanceCancelButton}
+              onPress={() => setAppearanceVisible(false)}
+            >
+              <Text style={styles.appearanceCancelText}>
+                Cancel
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       <Modal
         visible={editVisible}
@@ -931,7 +1132,24 @@ export default function ProfileScreen() {
   )
 }
 
-const styles = StyleSheet.create({
+type ProfilePalette = {
+  background: string
+  card: string
+  surface: string
+  text: string
+  muted: string
+  border: string
+  input: string
+  primary: string
+  primaryDark: string
+  primarySoft: string
+  success: string
+  warning: string
+  danger: string
+}
+
+function getStyles(palette: ProfilePalette) {
+  return StyleSheet.create({
   guestContainer: {
     flexGrow: 1,
     justifyContent: "center",
@@ -1068,7 +1286,7 @@ const styles = StyleSheet.create({
     width: 250,
     height: 250,
     borderRadius: 125,
-    backgroundColor: "#F1ECFF",
+    backgroundColor: palette.primarySoft,
     opacity: 0.6,
   },
   scrollContent: {
@@ -1250,10 +1468,10 @@ const styles = StyleSheet.create({
     backgroundColor: palette.primarySoft,
   },
   statIconSuccess: {
-    backgroundColor: "#E7F7EF",
+    backgroundColor: `${palette.success}18`,
   },
   statIconWarning: {
-    backgroundColor: "#FFF5DD",
+    backgroundColor: `${palette.warning}18`,
   },
   statNumber: {
     marginTop: 9,
@@ -1381,10 +1599,10 @@ const styles = StyleSheet.create({
     borderRadius: 11,
   },
   publicBadge: {
-    backgroundColor: "#E7F7EF",
+    backgroundColor: `${palette.success}18`,
   },
   privateBadge: {
-    backgroundColor: "#F0F1F5",
+    backgroundColor: palette.input,
   },
   accountSection: {
     marginTop: 28,
@@ -1411,7 +1629,7 @@ const styles = StyleSheet.create({
     backgroundColor: palette.primarySoft,
   },
   signOutIcon: {
-    backgroundColor: "#FFECEE",
+    backgroundColor: `${palette.danger}18`,
   },
   accountText: {
     flex: 1,
@@ -1434,6 +1652,114 @@ const styles = StyleSheet.create({
     height: 1,
     marginLeft: 54,
     backgroundColor: palette.border,
+  },
+  appearanceOverlay: {
+    flex: 1,
+    justifyContent: "flex-end",
+    padding: 14,
+    backgroundColor: "rgba(0,0,0,0.52)",
+  },
+  appearanceSheet: {
+    paddingHorizontal: 18,
+    paddingTop: 10,
+    paddingBottom: 18,
+    borderWidth: 1,
+    borderColor: palette.border,
+    borderRadius: 26,
+    backgroundColor: palette.card,
+  },
+  appearanceHandle: {
+    width: 42,
+    height: 5,
+    alignSelf: "center",
+    marginBottom: 18,
+    borderRadius: 3,
+    backgroundColor: palette.border,
+  },
+  appearanceTitle: {
+    fontSize: 21,
+    fontWeight: "900",
+    textAlign: "center",
+    color: palette.text,
+  },
+  appearanceSubtitle: {
+    marginTop: 6,
+    marginBottom: 18,
+    fontSize: 13,
+    lineHeight: 19,
+    textAlign: "center",
+    color: palette.muted,
+  },
+  themeOption: {
+    minHeight: 72,
+    marginBottom: 9,
+    paddingHorizontal: 13,
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: palette.border,
+    borderRadius: 18,
+    backgroundColor: palette.surface,
+  },
+  themeOptionSelected: {
+    borderColor: palette.primary,
+    backgroundColor: palette.primarySoft,
+  },
+  themeOptionIcon: {
+    width: 42,
+    height: 42,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 14,
+    backgroundColor: palette.input,
+  },
+  themeOptionIconSelected: {
+    backgroundColor: palette.card,
+  },
+  themeOptionText: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  themeOptionLabel: {
+    fontSize: 14,
+    fontWeight: "900",
+    color: palette.text,
+  },
+  themeOptionDescription: {
+    marginTop: 3,
+    fontSize: 12,
+    color: palette.muted,
+  },
+  radioOuter: {
+    width: 22,
+    height: 22,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: palette.border,
+    borderRadius: 11,
+  },
+  radioOuterSelected: {
+    borderColor: palette.primary,
+  },
+  radioInner: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: palette.primary,
+  },
+  appearanceCancelButton: {
+    minHeight: 48,
+    marginTop: 5,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 15,
+    backgroundColor: palette.input,
+  },
+  appearanceCancelText: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: palette.text,
   },
   modalSafeArea: {
     flex: 1,
@@ -1520,7 +1846,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: palette.border,
     borderRadius: 16,
-    backgroundColor: palette.card,
+    backgroundColor: palette.surface,
   },
   input: {
     flex: 1,
@@ -1554,3 +1880,4 @@ const styles = StyleSheet.create({
     color: palette.muted,
   },
 })
+}

@@ -1,12 +1,10 @@
 import { Ionicons } from "@expo/vector-icons"
 import Slider from "@react-native-community/slider"
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useMixes } from "@/context/MixContext"
 import { router, useLocalSearchParams } from "expo-router"
-import { useEffect } from "react"
-import { Alert } from "react-native"
-
 import {
+  Alert,
   FlatList,
   Image,
   Modal,
@@ -19,11 +17,11 @@ import {
 } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
 
-import { colors } from "@/constants/colors"
+import type { AppTheme } from "@/constants/colors"
+import { useAppTheme } from "@/context/AppThemeContext"
 import { flavors } from "@/data/flavors"
 import { Flavor } from "@/types"
 
-const theme = colors.light
 
 type SelectedFlavor = {
   flavor: Flavor
@@ -31,6 +29,8 @@ type SelectedFlavor = {
 }
 
 export default function BuilderScreen() {
+  const { theme } = useAppTheme()
+  const styles = useMemo(() => getStyles(theme), [theme])
   const [selectedFlavors, setSelectedFlavors] = useState<SelectedFlavor[]>([])
   const [showFlavorPicker, setShowFlavorPicker] = useState(false)
   const [search, setSearch] = useState("")
@@ -258,31 +258,81 @@ async function handleSaveMix() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.title}>Mix Builder</Text>
-            <Text style={styles.subtitle}>
-              Create your perfect hookah flavor blend.
+        <View style={styles.hero}>
+          <View style={styles.heroGlowOne} />
+          <View style={styles.heroGlowTwo} />
+
+          <View style={styles.heroTopRow}>
+            <View style={styles.heroIcon}>
+              <Ionicons
+                name="flask"
+                size={24}
+                color="#FFFFFF"
+              />
+            </View>
+
+            <TouchableOpacity
+              style={styles.heroResetButton}
+              onPress={resetBuilder}
+            >
+              <Ionicons
+                name="refresh-outline"
+                size={18}
+                color="#FFFFFF"
+              />
+              <Text style={styles.heroResetText}>Reset</Text>
+            </TouchableOpacity>
+          </View>
+
+          <Text style={styles.heroTitle}>
+            {isEditing ? "Refine your mix" : "Build your perfect blend"}
+          </Text>
+
+          <Text style={styles.heroSubtitle}>
+            Combine 2 to 4 flavors and balance the percentages until your blend reaches 100%.
+          </Text>
+
+          <View style={styles.heroSteps}>
+            <View style={styles.heroStep}>
+              <View style={styles.heroStepNumber}>
+                <Text style={styles.heroStepNumberText}>1</Text>
+              </View>
+              <Text style={styles.heroStepText}>Choose flavors</Text>
+            </View>
+
+            <View style={styles.heroStepDivider} />
+
+            <View style={styles.heroStep}>
+              <View style={styles.heroStepNumber}>
+                <Text style={styles.heroStepNumberText}>2</Text>
+              </View>
+              <Text style={styles.heroStepText}>Set amounts</Text>
+            </View>
+
+            <View style={styles.heroStepDivider} />
+
+            <View style={styles.heroStep}>
+              <View style={styles.heroStepNumber}>
+                <Text style={styles.heroStepNumberText}>3</Text>
+              </View>
+              <Text style={styles.heroStepText}>Save mix</Text>
+            </View>
+          </View>
+        </View>
+
+        {isEditing ? (
+          <View style={styles.editingBanner}>
+            <Ionicons
+              name="create-outline"
+              size={17}
+              color={theme.primary}
+            />
+
+            <Text style={styles.editingBannerText}>
+              Editing {editingMix?.name}
             </Text>
           </View>
-          {isEditing ? (
-  <View style={styles.editingBanner}>
-    <Ionicons
-      name="create-outline"
-      size={17}
-      color={theme.primary}
-    />
-
-    <Text style={styles.editingBannerText}>
-      Editing {editingMix?.name}
-    </Text>
-  </View>
-) : null}
-
-          <TouchableOpacity style={styles.resetButton} onPress={resetBuilder}>
-            <Ionicons name="refresh-outline" size={21} color={theme.primary} />
-          </TouchableOpacity>
-        </View>
+        ) : null}
 
         <View style={styles.progressCard}>
           <View style={styles.progressHeader}>
@@ -383,13 +433,15 @@ async function handleSaveMix() {
           <View style={styles.selectedFlavorList}>
             {selectedFlavors.map((item) => (
               <SelectedFlavorCard
-  key={item.flavor.id}
-  item={item}
-  onPercentageChange={(value) =>
-    updatePercentage(item.flavor.id, value)
-  }
-  onRemove={() => removeFlavor(item.flavor.id)}
-/>
+                key={item.flavor.id}
+                item={item}
+                onPercentageChange={(value) =>
+                  updatePercentage(item.flavor.id, value)
+                }
+                onRemove={() => removeFlavor(item.flavor.id)}
+                theme={theme}
+                styles={styles}
+              />
             ))}
           </View>
         )}
@@ -525,6 +577,8 @@ async function handleSaveMix() {
           setSearch("")
         }}
         onSelect={addFlavor}
+        theme={theme}
+        styles={styles}
       />
     </SafeAreaView>
   )
@@ -534,12 +588,16 @@ type SelectedFlavorCardProps = {
   item: SelectedFlavor
   onPercentageChange: (value: number) => void
   onRemove: () => void
+  theme: AppTheme
+  styles: ReturnType<typeof getStyles>
 }
 
 function SelectedFlavorCard({
   item,
   onPercentageChange,
   onRemove,
+  theme,
+  styles,
 }: SelectedFlavorCardProps) {
   return (
     <View style={styles.selectedFlavorCard}>
@@ -610,6 +668,8 @@ type FlavorPickerModalProps = {
   selectedCount: number
   onClose: () => void
   onSelect: (flavor: Flavor) => void
+  theme: AppTheme
+  styles: ReturnType<typeof getStyles>
 }
 
 function FlavorPickerModal({
@@ -620,6 +680,8 @@ function FlavorPickerModal({
   selectedCount,
   onClose,
   onSelect,
+  theme,
+  styles,
 }: FlavorPickerModalProps) {
   return (
     <Modal
@@ -727,7 +789,8 @@ function FlavorPickerModal({
   )
 }
 
-const styles = StyleSheet.create({
+function getStyles(theme: AppTheme) {
+  return StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: theme.background,
@@ -770,12 +833,134 @@ const styles = StyleSheet.create({
     backgroundColor: theme.surface,
   },
 
+  hero: {
+    marginHorizontal: 18,
+    marginTop: 14,
+    marginBottom: 16,
+    padding: 22,
+    overflow: "hidden",
+    borderRadius: 28,
+    backgroundColor: theme.primary,
+  },
+
+  heroGlowOne: {
+    position: "absolute",
+    top: -48,
+    right: -34,
+    width: 155,
+    height: 155,
+    borderRadius: 78,
+    backgroundColor: "rgba(255,255,255,0.12)",
+  },
+
+  heroGlowTwo: {
+    position: "absolute",
+    bottom: -58,
+    left: -35,
+    width: 150,
+    height: 150,
+    borderRadius: 75,
+    backgroundColor: "rgba(255,255,255,0.07)",
+  },
+
+  heroTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+
+  heroIcon: {
+    width: 46,
+    height: 46,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 15,
+    backgroundColor: "rgba(255,255,255,0.17)",
+  },
+
+  heroResetButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.15)",
+  },
+
+  heroResetText: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#FFFFFF",
+  },
+
+  heroTitle: {
+    marginTop: 20,
+    maxWidth: 315,
+    fontSize: 28,
+    lineHeight: 34,
+    fontWeight: "900",
+    letterSpacing: -0.7,
+    color: "#FFFFFF",
+  },
+
+  heroSubtitle: {
+    marginTop: 8,
+    maxWidth: 325,
+    fontSize: 14,
+    lineHeight: 21,
+    color: "rgba(255,255,255,0.82)",
+  },
+
+  heroSteps: {
+    marginTop: 20,
+    paddingTop: 17,
+    flexDirection: "row",
+    alignItems: "center",
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.16)",
+  },
+
+  heroStep: {
+    flex: 1,
+    alignItems: "center",
+  },
+
+  heroStepNumber: {
+    width: 25,
+    height: 25,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 13,
+    backgroundColor: "rgba(255,255,255,0.18)",
+  },
+
+  heroStepNumberText: {
+    fontSize: 11,
+    fontWeight: "900",
+    color: "#FFFFFF",
+  },
+
+  heroStepText: {
+    marginTop: 6,
+    fontSize: 10,
+    fontWeight: "700",
+    color: "rgba(255,255,255,0.78)",
+  },
+
+  heroStepDivider: {
+    width: 18,
+    height: 1,
+    marginBottom: 17,
+    backgroundColor: "rgba(255,255,255,0.25)",
+  },
+
   progressCard: {
-    marginHorizontal: 20,
-    padding: 18,
+    marginHorizontal: 18,
+    padding: 19,
     borderWidth: 1,
     borderColor: theme.border,
-    borderRadius: 20,
+    borderRadius: 22,
     backgroundColor: theme.card,
   },
 
@@ -811,7 +996,7 @@ const styles = StyleSheet.create({
   },
 
   statusBadgeComplete: {
-    backgroundColor: "#EDF7EC",
+    backgroundColor: `${theme.success}18`,
   },
 
   statusBadgeIncomplete: {
@@ -859,7 +1044,7 @@ const styles = StyleSheet.create({
   sectionHeader: {
     marginTop: 27,
     marginBottom: 13,
-    paddingHorizontal: 20,
+    paddingHorizontal: 18,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -878,8 +1063,8 @@ const styles = StyleSheet.create({
   },
 
   emptyFlavorCard: {
-    marginHorizontal: 20,
-    paddingVertical: 28,
+    marginHorizontal: 18,
+    paddingVertical: 30,
     paddingHorizontal: 20,
     alignItems: "center",
     borderWidth: 1.5,
@@ -913,7 +1098,7 @@ const styles = StyleSheet.create({
   },
 
   selectedFlavorList: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 18,
     gap: 12,
   },
 
@@ -966,7 +1151,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 15,
-    backgroundColor: "#FCEDEA",
+    backgroundColor: `${theme.danger}18`,
   },
 
   sliderHeader: {
@@ -1017,7 +1202,7 @@ sliderScaleText: {
 
   addFlavorButton: {
     height: 52,
-    marginHorizontal: 20,
+    marginHorizontal: 18,
     marginTop: 13,
     flexDirection: "row",
     alignItems: "center",
@@ -1036,11 +1221,11 @@ sliderScaleText: {
   },
 
   formCard: {
-    marginHorizontal: 20,
-    padding: 17,
+    marginHorizontal: 18,
+    padding: 18,
     borderWidth: 1,
     borderColor: theme.border,
-    borderRadius: 20,
+    borderRadius: 22,
     backgroundColor: theme.card,
   },
 
@@ -1082,11 +1267,11 @@ sliderScaleText: {
   },
 
   previewCard: {
-    marginHorizontal: 20,
-    padding: 17,
+    marginHorizontal: 18,
+    padding: 18,
     borderWidth: 1,
     borderColor: theme.border,
-    borderRadius: 20,
+    borderRadius: 22,
     backgroundColor: theme.card,
   },
 
@@ -1166,7 +1351,7 @@ sliderScaleText: {
 
   saveButton: {
     height: 56,
-    marginHorizontal: 20,
+    marginHorizontal: 18,
     marginTop: 28,
     flexDirection: "row",
     alignItems: "center",
@@ -1364,3 +1549,4 @@ editingBannerText: {
 
   
 })
+}

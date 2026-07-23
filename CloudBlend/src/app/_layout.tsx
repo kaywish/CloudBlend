@@ -2,33 +2,48 @@ import { Stack } from "expo-router"
 import { StatusBar } from "expo-status-bar"
 
 import { AuthProvider } from "@/context/AuthContext"
-import { ProfileProvider } from "@/context/ProfileContext"
+import { AppThemeProvider, useAppTheme } from "@/context/AppThemeContext"
 import { MixProvider } from "@/context/MixContext"
+import { ProfileProvider } from "@/context/ProfileContext"
 
-import { colors } from "@/constants/colors"
+function AppNavigator() {
+  const { theme, resolvedTheme } = useAppTheme()
+
+  return (
+    <>
+      <StatusBar
+        style={resolvedTheme === "dark" ? "light" : "dark"}
+      />
+
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          contentStyle: {
+            backgroundColor: theme.background,
+          },
+        }}
+      >
+        <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="auth" />
+        <Stack.Screen name="forgot-password" />
+        <Stack.Screen name="reset-password" />
+        <Stack.Screen name="flavor/[id]" />
+        <Stack.Screen name="mix/[id]" />
+      </Stack>
+    </>
+  )
+}
 
 export default function RootLayout() {
   return (
-    <AuthProvider>
-      <ProfileProvider>
-        <MixProvider>
-          <StatusBar style="dark" />
-
-          <Stack
-            screenOptions={{
-              headerShown: false,
-              contentStyle: {
-                backgroundColor: colors.light.background,
-              },
-            }}
-          >
-            <Stack.Screen name="(tabs)" />
-            <Stack.Screen name="auth" />
-            <Stack.Screen name="flavor/[id]" />
-            <Stack.Screen name="mix/[id]" />
-          </Stack>
-        </MixProvider>
-      </ProfileProvider>
-    </AuthProvider>
+    <AppThemeProvider>
+      <AuthProvider>
+        <ProfileProvider>
+          <MixProvider>
+            <AppNavigator />
+          </MixProvider>
+        </ProfileProvider>
+      </AuthProvider>
+    </AppThemeProvider>
   )
 }
