@@ -7,7 +7,11 @@ import {
   useMemo,
   useState,
 } from "react"
-
+import {
+  fetchApprovedFlavorImages,
+  fetchUserFlavorImageSubmissions,
+  submitFlavorImage,
+} from "@/services/flavorImageService"
 import { useAuth } from "@/context/AuthContext"
 
 import {
@@ -28,7 +32,9 @@ import type {
   BrandStatistics,
   CreateFlavorRatingInput,
   Flavor,
+  FlavorImageSubmission,
   FlavorRating,
+  SubmitFlavorImageInput,
 } from "@/types/flavor"
 
 type FlavorContextValue = {
@@ -52,6 +58,7 @@ type FlavorContextValue = {
   loadFlavorRatings: (
     flavorId: string
   ) => Promise<FlavorRating[]>
+  
 
   isFlavorFavorite: (flavorId: string) => boolean
   toggleFavoriteFlavor: (flavorId: string) => Promise<void>
@@ -169,6 +176,40 @@ export function FlavorProvider({
     },
     []
   )
+
+  const loadApprovedFlavorImages = useCallback(
+  async (flavorId: string) => {
+    return fetchApprovedFlavorImages(flavorId)
+  },
+  []
+)
+
+const loadMyFlavorImageSubmissions = useCallback(
+  async (flavorId?: string) => {
+    if (!user) {
+      return []
+    }
+
+    return fetchUserFlavorImageSubmissions(
+      user.id,
+      flavorId
+    )
+  },
+  [user]
+)
+
+const submitFlavorPhoto = useCallback(
+  async (input: SubmitFlavorImageInput) => {
+    if (!user) {
+      throw new Error(
+        "You must be signed in to submit a photo."
+      )
+    }
+
+    return submitFlavorImage(input, user.id)
+  },
+  [user]
+)
 
   const isFlavorFavorite = useCallback(
     (flavorId: string) =>
@@ -304,17 +345,26 @@ export function FlavorProvider({
   )
 
   const topFlavors = useMemo(() => {
-    return [...flavors]
-      .filter((flavor) => flavor.ratingCount > 0)
-      .sort((a, b) => {
-        if (b.averageRating !== a.averageRating) {
-          return b.averageRating - a.averageRating
-        }
+  return [...flavors]
+    .sort((a, b) => {
+      if (b.averageRating !== a.averageRating) {
+        return b.averageRating - a.averageRating
+      }
 
+      if (b.ratingCount !== a.ratingCount) {
         return b.ratingCount - a.ratingCount
-      })
-      .slice(0, 10)
-  }, [flavors])
+      }
+
+      if (b.favoriteCount !== a.favoriteCount) {
+        return b.favoriteCount - a.favoriteCount
+      }
+
+      return a.name.localeCompare(b.name)
+    })
+    .slice(0, 10)
+}, [flavors])
+
+
 
   const trendingFlavors = useMemo(() => {
     return [...flavors]
@@ -370,6 +420,10 @@ export function FlavorProvider({
 
       submitFlavorRating,
       removeFlavorRating,
+      loadApprovedFlavorImages,
+loadMyFlavorImageSubmissions,
+submitFlavorPhoto,
+
     }),
     [
       brands,
@@ -401,6 +455,17 @@ export function FlavorProvider({
 }
 
 export function useFlavors(): FlavorContextValue {
+  loadApprovedFlavorImages: (
+  flavorId: string
+) => Promise<FlavorImageSubmission[]>
+
+loadMyFlavorImageSubmissions: (
+  flavorId?: string
+) => Promise<FlavorImageSubmission[]>
+
+submitFlavorPhoto: (
+  input: SubmitFlavorImageInput
+) => Promise<FlavorImageSubmission>
   const context = useContext(FlavorContext)
 
   if (!context) {

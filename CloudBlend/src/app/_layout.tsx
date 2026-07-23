@@ -41,9 +41,9 @@ export default function RootLayout() {
   <AuthProvider>
     <ProfileProvider>
       <MixProvider>
-        <FlavorProvider>
-          <Stack />
-        </FlavorProvider>
+         <FlavorProvider>
+              <AppNavigator />
+            </FlavorProvider>
       </MixProvider>
     </ProfileProvider>
   </AuthProvider>

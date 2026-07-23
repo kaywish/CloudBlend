@@ -1,8 +1,7 @@
 import { Ionicons } from "@expo/vector-icons"
 import Slider from "@react-native-community/slider"
-import { useEffect, useMemo, useState } from "react"
-import { useMixes } from "@/context/MixContext"
 import { router, useLocalSearchParams } from "expo-router"
+import { useEffect, useMemo, useState } from "react"
 import {
   Alert,
   FlatList,
@@ -19,48 +18,85 @@ import { SafeAreaView } from "react-native-safe-area-context"
 
 import type { AppTheme } from "@/constants/colors"
 import { useAppTheme } from "@/context/AppThemeContext"
-import { flavors } from "@/data/flavors"
-import { Flavor } from "@/types"
-
+import { useMixes } from "@/context/MixContext"
+import { useFlavors } from "@/context/FlavorContext"
+import type { Flavor } from "@/types"
 
 type SelectedFlavor = {
   flavor: Flavor
   percentage: number
 }
 
+type BuilderParams = {
+  editMixId?: string | string[]
+  flavorId?: string | string[]
+}
+
+function getSingleParam(value?: string | string[]) {
+  return Array.isArray(value) ? value[0] : value
+}
+
+function getFlavorBrandName(flavor: Flavor): string {
+  const value = flavor as Flavor & {
+    brandName?: string | null
+    brand?: string | { name?: string | null } | null
+  }
+
+  if (typeof value.brandName === "string" && value.brandName.trim()) {
+    return value.brandName.trim()
+  }
+
+  if (typeof value.brand === "string" && value.brand.trim()) {
+    return value.brand.trim()
+  }
+
+  if (
+    value.brand &&
+    typeof value.brand === "object" &&
+    typeof value.brand.name === "string"
+  ) {
+    return value.brand.name.trim()
+  }
+
+  return ""
+}
+
 export default function BuilderScreen() {
   const { theme } = useAppTheme()
   const styles = useMemo(() => getStyles(theme), [theme])
+
+  const params = useLocalSearchParams<BuilderParams>()
+  const editMixId = getSingleParam(params.editMixId)
+  const requestedFlavorId = getSingleParam(params.flavorId)
+
+  const { saveMix, updateMix, getMixById } = useMixes()
+  const {
+    flavors: databaseFlavors,
+    getFlavorById,
+    loadFlavorById,
+  } = useFlavors()
+
   const [selectedFlavors, setSelectedFlavors] = useState<SelectedFlavor[]>([])
   const [showFlavorPicker, setShowFlavorPicker] = useState(false)
   const [search, setSearch] = useState("")
   const [mixName, setMixName] = useState("")
   const [notes, setNotes] = useState("")
-  const { editMixId } = useLocalSearchParams<{
-  editMixId?: string
-}>()
+  const [isSaving, setIsSaving] = useState(false)
 
-const {
-  saveMix,
-  updateMix,
-  getMixById,
-} = useMixes()
+  const editingMix = editMixId ? getMixById(editMixId) : undefined
+  const isEditing = Boolean(editingMix)
 
-const editingMix =
-  typeof editMixId === "string"
-    ? getMixById(editMixId)
-    : undefined
-
-const isEditing = Boolean(editingMix)
-
-  const totalPercentage = useMemo(() => {
-    return selectedFlavors.reduce(
-      (total, item) => total + item.percentage,
-      0
-    )
-  }, [selectedFlavors])
+  const totalPercentage = useMemo(
+    () =>
+      selectedFlavors.reduce(
+        (total, item) => total + item.percentage,
+        0
+      ),
+    [selectedFlavors]
+  )
 
   const remainingPercentage = 100 - totalPercentage
+
   const isValidMix =
     selectedFlavors.length >= 2 &&
     selectedFlavors.length <= 4 &&
@@ -70,7 +106,7 @@ const isEditing = Boolean(editingMix)
   const filteredFlavors = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase()
 
-    return flavors.filter((flavor) => {
+    return databaseFlavors.filter((flavor) => {
       const isAlreadySelected = selectedFlavors.some(
         (item) => item.flavor.id === flavor.id
       )
@@ -78,66 +114,160 @@ const isEditing = Boolean(editingMix)
       const matchesSearch =
         normalizedSearch.length === 0 ||
         flavor.name.toLowerCase().includes(normalizedSearch) ||
-        flavor.brand.toLowerCase().includes(normalizedSearch)
+        getFlavorBrandName(flavor)
+          .toLowerCase()
+          .includes(normalizedSearch)
 
       return !isAlreadySelected && matchesSearch
     })
-  }, [search, selectedFlavors])
+  }, [databaseFlavors, search, selectedFlavors])
 
-
-useEffect(() => {
-  if (!editingMix) {
-    return
-  }
-
-  setMixName(editingMix.name)
-  setNotes(editingMix.notes ?? "")
-
-  const restoredFlavors = editingMix.ingredients
-    .map((ingredient) => {
-      const flavor = flavors.find(
-        (item) => item.id === ingredient.flavorId
-      )
-
-      if (!flavor) {
-        return null
-      }
-
-      return {
-        flavor,
-        percentage: ingredient.percentage,
-      }
-    })
-    .filter(
-      (
-        item
-      ): item is {
-        flavor: (typeof flavors)[number]
-        percentage: number
-      } => item !== null
-    )
-
-  setSelectedFlavors(restoredFlavors)
-}, [editingMix])
-
-
-  function addFlavor(flavor: Flavor) {
-    if (selectedFlavors.length >= 4) {
+  /*
+   * Restore an existing mix when this screen is opened in edit mode.
+   * The flavorId route parameter is intentionally ignored while editing.
+   */
+  useEffect(() => {
+    if (!editingMix) {
       return
     }
 
-    const defaultPercentage =
-      selectedFlavors.length === 0
-        ? 100
-        : Math.max(0, Math.min(25, remainingPercentage))
+    setMixName(editingMix.name)
+    setNotes(editingMix.notes ?? "")
 
-    setSelectedFlavors((current) => [
-      ...current,
-      {
-        flavor,
-        percentage: defaultPercentage,
-      },
-    ])
+    const restoredFlavors = editingMix.ingredients
+      .map((ingredient) => {
+        const flavor =
+          databaseFlavors.find(
+            (item) => item.id === ingredient.flavorId
+          ) ?? getFlavorById(ingredient.flavorId)
+
+        if (!flavor) {
+          return null
+        }
+
+        return {
+          flavor,
+          percentage: ingredient.percentage,
+        }
+      })
+      .filter(
+        (
+          item
+        ): item is {
+          flavor: Flavor
+          percentage: number
+        } => item !== null
+      )
+
+    setSelectedFlavors(restoredFlavors)
+  }, [databaseFlavors, editingMix, getFlavorById])
+
+  /*
+   * When the user taps "Create a mix" from a Flavor Detail page,
+   * automatically begin the new mix with that flavor selected.
+   */
+  useEffect(() => {
+    if (isEditing || !requestedFlavorId) {
+      return
+    }
+
+    let isActive = true
+
+    async function addRequestedFlavor() {
+      try {
+        const cachedFlavor = getFlavorById(requestedFlavorId!)
+
+        const requestedFlavor =
+          cachedFlavor ??
+          (await loadFlavorById(requestedFlavorId!))
+
+        if (!isActive || !requestedFlavor) {
+          return
+        }
+
+        setSelectedFlavors((current) => {
+          const alreadySelected = current.some(
+            (item) => item.flavor.id === requestedFlavor.id
+          )
+
+          if (alreadySelected || current.length >= 4) {
+            return current
+          }
+
+          return [
+            ...current,
+            {
+              flavor: requestedFlavor,
+              percentage: current.length === 0 ? 50 : 0,
+            },
+          ]
+        })
+      } catch (error) {
+        console.error(
+          "Could not add requested flavor to builder:",
+          error
+        )
+      }
+    }
+
+    addRequestedFlavor()
+
+    return () => {
+      isActive = false
+    }
+  }, [
+    getFlavorById,
+    isEditing,
+    loadFlavorById,
+    requestedFlavorId,
+  ])
+
+  function addFlavor(flavor: Flavor) {
+    setSelectedFlavors((current) => {
+      if (
+        current.length >= 4 ||
+        current.some((item) => item.flavor.id === flavor.id)
+      ) {
+        return current
+      }
+
+      const currentTotal = current.reduce(
+        (total, item) => total + item.percentage,
+        0
+      )
+      const remaining = Math.max(0, 100 - currentTotal)
+
+      if (current.length === 0) {
+        return [{ flavor, percentage: 100 }]
+      }
+
+      if (remaining > 0) {
+        return [
+          ...current,
+          {
+            flavor,
+            percentage: remaining,
+          },
+        ]
+      }
+
+      // If the current blend already totals 100%, rebalance all flavors
+      // so the newly selected flavor immediately receives a usable amount.
+      const nextCount = current.length + 1
+      const basePercentage = Math.floor(100 / nextCount)
+      const remainder = 100 - basePercentage * nextCount
+
+      return [
+        ...current,
+        {
+          flavor,
+          percentage: 0,
+        },
+      ].map((item, index) => ({
+        ...item,
+        percentage: basePercentage + (index === 0 ? remainder : 0),
+      }))
+    })
 
     setShowFlavorPicker(false)
     setSearch("")
@@ -149,20 +279,18 @@ useEffect(() => {
     )
   }
 
-function updatePercentage(flavorId: string, percentage: number) {
-  setSelectedFlavors((current) =>
-    current.map((item) =>
-      item.flavor.id === flavorId
-        ? {
-            ...item,
-            percentage: Math.round(percentage),
-          }
-        : item
+  function updatePercentage(flavorId: string, percentage: number) {
+    setSelectedFlavors((current) =>
+      current.map((item) =>
+        item.flavor.id === flavorId
+          ? {
+              ...item,
+              percentage: Math.round(percentage),
+            }
+          : item
+      )
     )
-  )
-}
-
-
+  }
 
   function distributeEvenly() {
     if (selectedFlavors.length === 0) {
@@ -185,72 +313,89 @@ function updatePercentage(flavorId: string, percentage: number) {
     setMixName("")
     setNotes("")
     setSearch("")
+    setShowFlavorPicker(false)
   }
 
-async function handleSaveMix() {
-  if (!isValidMix) {
-    Alert.alert(
-      "Incomplete Mix",
-      "Choose 2–4 flavors and make sure the total equals 100%."
-    )
-    return
-  }
-
-  if (!mixName.trim()) {
-    Alert.alert(
-      "Mix Name Required",
-      "Please enter a name for your mix."
-    )
-    return
-  }
-
-  const mixData = {
-    name: mixName.trim(),
-    notes: notes.trim(),
-    ingredients: selectedFlavors.map((item) => ({
-      flavorId: item.flavor.id,
-      flavorName: item.flavor.name,
-      brand: item.flavor.brand,
-      image: item.flavor.image,
-      percentage: item.percentage,
-    })),
-  }
-
-  try {
-    if (editingMix) {
-      await updateMix(editingMix.id, mixData)
-
-      resetBuilder()
-
-      router.replace({
-        pathname: "/mix/[id]",
-        params: {
-          id: editingMix.id,
-        },
-      })
-
+  async function handleSaveMix() {
+    if (isSaving) {
       return
     }
 
-    const newMix = await saveMix(mixData)
+    if (selectedFlavors.length < 2 || selectedFlavors.length > 4) {
+      Alert.alert(
+        "Choose More Flavors",
+        "A mix must contain between 2 and 4 flavors."
+      )
+      return
+    }
 
-    resetBuilder()
+    if (totalPercentage !== 100) {
+      Alert.alert(
+        "Check Percentages",
+        "Your flavor percentages must total exactly 100%."
+      )
+      return
+    }
 
-    router.push({
-      pathname: "/mix/[id]",
-      params: {
-        id: newMix.id,
-      },
-    })
-  } catch (error) {
-    console.error("Could not save mix:", error)
+    if (!mixName.trim()) {
+      Alert.alert(
+        "Mix Name Required",
+        "Please enter a name for your mix."
+      )
+      return
+    }
 
-    Alert.alert(
-      "Could Not Save Mix",
-      "Something went wrong while saving your mix."
-    )
+    const mixData = {
+      name: mixName.trim(),
+      notes: notes.trim(),
+      ingredients: selectedFlavors.map((item) => ({
+        flavorId: item.flavor.id,
+        flavorName: item.flavor.name,
+        brand: getFlavorBrandName(item.flavor) || null,
+        image: item.flavor.image,
+        percentage: item.percentage,
+      })),
+    }
+
+    setIsSaving(true)
+
+    try {
+      if (editingMix) {
+        await updateMix(editingMix.id, mixData)
+
+        resetBuilder()
+
+        router.replace({
+          pathname: "/mix/[id]",
+          params: {
+            id: editingMix.id,
+          },
+        })
+
+        return
+      }
+
+      const newMix = await saveMix(mixData)
+
+      resetBuilder()
+
+      router.push({
+        pathname: "/mix/[id]",
+        params: {
+          id: newMix.id,
+        },
+      })
+    } catch (error) {
+      console.error("Could not save mix:", error)
+
+      Alert.alert(
+        "Could Not Save Mix",
+        "Something went wrong while saving your mix."
+      )
+    } finally {
+      setIsSaving(false)
+    }
   }
-}
 
   return (
     <SafeAreaView style={styles.safeArea} edges={["top"]}>
@@ -529,9 +674,11 @@ async function handleSaveMix() {
                         <Text style={styles.previewFlavorName}>
                           {item.flavor.name}
                         </Text>
+                        {getFlavorBrandName(item.flavor) ? (
                         <Text style={styles.previewFlavorBrand}>
-                          {item.flavor.brand}
+                          {getFlavorBrandName(item.flavor)}
                         </Text>
+                      ) : null}
                       </View>
                     </View>
 
@@ -548,20 +695,20 @@ async function handleSaveMix() {
         <TouchableOpacity
           style={[
             styles.saveButton,
-            !isValidMix && styles.saveButtonDisabled,
+            (!isValidMix || isSaving) && styles.saveButtonDisabled,
           ]}
-          activeOpacity={isValidMix ? 0.85 : 1}
+          activeOpacity={isValidMix && !isSaving ? 0.85 : 1}
           onPress={handleSaveMix}
-          disabled={!isValidMix}
+          disabled={!isValidMix || isSaving}
         >
           <Ionicons
-  name={isEditing ? "checkmark-circle-outline" : "save-outline"}
+  name={isSaving ? "hourglass-outline" : isEditing ? "checkmark-circle-outline" : "save-outline"}
   size={21}
   color="#FFFFFF"
 />
 
          <Text style={styles.saveButtonText}>
-  {isEditing ? "Update Mix" : "Save Mix"}
+  {isSaving ? "Saving..." : isEditing ? "Update Mix" : "Save Mix"}
 </Text>
         </TouchableOpacity>
       </ScrollView>
@@ -612,9 +759,11 @@ function SelectedFlavorCard({
             {item.flavor.name}
           </Text>
 
-          <Text style={styles.selectedFlavorBrand}>
-            {item.flavor.brand}
-          </Text>
+          {getFlavorBrandName(item.flavor) ? (
+            <Text style={styles.selectedFlavorBrand}>
+              {getFlavorBrandName(item.flavor)}
+            </Text>
+          ) : null}
         </View>
 
         <TouchableOpacity
@@ -753,15 +902,23 @@ function FlavorPickerModal({
 
               <View style={styles.modalFlavorContent}>
                 <Text style={styles.modalFlavorName}>{item.name}</Text>
-                <Text style={styles.modalFlavorBrand}>{item.brand}</Text>
+                {getFlavorBrandName(item) ? (
+                  <Text style={styles.modalFlavorBrand}>
+                    {getFlavorBrandName(item)}
+                  </Text>
+                ) : null}
 
-                <View style={styles.modalTagRow}>
-                  {item.categories.slice(0, 3).map((category) => (
-                    <View key={category} style={styles.modalTag}>
-                      <Text style={styles.modalTagText}>{category}</Text>
-                    </View>
-                  ))}
-                </View>
+                {(item.categories ?? []).length > 0 ? (
+                  <View style={styles.modalTagRow}>
+                    {(item.categories ?? []).slice(0, 3).map((category) => (
+                      <View key={category} style={styles.modalTag}>
+                        <Text style={styles.modalTagText}>
+                          {category}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                ) : null}
               </View>
 
               <View style={styles.modalAddIcon}>

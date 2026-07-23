@@ -1,7 +1,6 @@
 import { Ionicons } from "@expo/vector-icons"
 import { router, useFocusEffect } from "expo-router"
 import { useCallback, useMemo, useState } from "react"
-import { useFlavors } from "@/context/FlavorContext"
 import {
   ActivityIndicator,
   FlatList,
@@ -17,26 +16,12 @@ import { SafeAreaView } from "react-native-safe-area-context"
 
 import type { AppTheme } from "@/constants/colors"
 import { useAppTheme } from "@/context/AppThemeContext"
+import { useFlavors } from "@/context/FlavorContext"
 import { useMixes } from "@/context/MixContext"
 
 type SortOption = "newest" | "popular"
 
 export default function ExploreScreen() {
-  const {
-  flavors,
-  brands,
-  topFlavors,
-  topBrands,
-  isLoading: isLoadingFlavors,
-  error: flavorError,
-} = useFlavors()
-
-console.log("Flavors:", flavors.length)
-console.log("Brands:", brands.length)
-console.log("Top flavors:", topFlavors)
-console.log("Top brands:", topBrands)
-console.log("Flavor loading:", isLoadingFlavors)
-console.log("Flavor error:", flavorError)
   const { theme } = useAppTheme()
   const styles = useMemo(() => getStyles(theme), [theme])
 
@@ -47,6 +32,13 @@ console.log("Flavor error:", flavorError)
     toggleLike,
   } = useMixes()
 
+  const {
+    topFlavors,
+    topBrands,
+    isLoading: isLoadingFlavors,
+    refreshFlavors,
+  } = useFlavors()
+
   const [searchQuery, setSearchQuery] = useState("")
   const [sortOption, setSortOption] =
     useState<SortOption>("newest")
@@ -56,10 +48,12 @@ console.log("Flavor error:", flavorError)
 
   useFocusEffect(
     useCallback(() => {
-      refreshPublicMixes().catch((error) => {
-        console.error("Could not load public mixes:", error)
-      })
-    }, [refreshPublicMixes])
+      Promise.all([refreshPublicMixes(), refreshFlavors()]).catch(
+        (error) => {
+          console.error("Could not load Explore data:", error)
+        }
+      )
+    }, [refreshFlavors, refreshPublicMixes])
   )
 
   const displayedMixes = useMemo(() => {
@@ -197,9 +191,12 @@ console.log("Flavor error:", flavorError)
           <RefreshControl
             refreshing={isLoadingPublic}
             onRefresh={() => {
-              refreshPublicMixes().catch((error) => {
+              Promise.all([
+                refreshPublicMixes(),
+                refreshFlavors(),
+              ]).catch((error) => {
                 console.error(
-                  "Could not refresh mixes:",
+                  "Could not refresh Explore data:",
                   error
                 )
               })
@@ -293,6 +290,206 @@ console.log("Flavor error:", flavorError)
                   />
                 </TouchableOpacity>
               ) : null}
+            </View>
+
+            <View style={styles.discoverySection}>
+              <View style={styles.discoveryHeader}>
+                <View style={styles.discoveryHeaderText}>
+                  <Text style={styles.discoveryEyebrow}>
+                    FLAVOR CATALOG
+                  </Text>
+
+                  <Text style={styles.discoveryTitle}>
+                    Top Flavors
+                  </Text>
+
+                  <Text style={styles.discoverySubtitle}>
+                    Discover popular flavors from the community.
+                  </Text>
+                </View>
+
+                <View style={styles.discoveryIcon}>
+                  <Ionicons
+                    name="star"
+                    size={18}
+                    color="#F4B740"
+                  />
+                </View>
+              </View>
+
+              {isLoadingFlavors && topFlavors.length === 0 ? (
+                <View style={styles.discoveryLoading}>
+                  <ActivityIndicator
+                    size="small"
+                    color={theme.primary}
+                  />
+                </View>
+              ) : (
+                <FlatList
+                  horizontal
+                  data={topFlavors}
+                  keyExtractor={(item) => item.id}
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.horizontalListContent}
+                  renderItem={({ item }) => (
+                    <TouchableOpacity
+                      style={styles.flavorCard}
+                      activeOpacity={0.85}
+                      onPress={() =>
+                        router.push({
+                          pathname: "/flavor/[id]",
+                          params: { id: item.id },
+                        })
+                      }
+                    >
+                      <View style={styles.flavorImageContainer}>
+                        {item.imageUrl ? (
+                          <Image
+                            source={{ uri: item.imageUrl }}
+                            style={styles.flavorImage}
+                          />
+                        ) : (
+                          <Ionicons
+                            name="leaf-outline"
+                            size={29}
+                            color={theme.primary}
+                          />
+                        )}
+                      </View>
+
+                      <Text
+                        style={styles.flavorName}
+                        numberOfLines={1}
+                      >
+                        {item.name}
+                      </Text>
+
+                      <Text
+                        style={styles.flavorBrand}
+                        numberOfLines={1}
+                      >
+                        {item.brandName}
+                      </Text>
+
+                      <View style={styles.flavorStatsRow}>
+                        <Ionicons
+                          name="star"
+                          size={13}
+                          color="#F4B740"
+                        />
+
+                        <Text style={styles.flavorRating}>
+                          {item.ratingCount > 0
+                            ? item.averageRating.toFixed(1)
+                            : "New"}
+                        </Text>
+
+                        {item.ratingCount > 0 ? (
+                          <Text style={styles.flavorRatingCount}>
+                            ({item.ratingCount})
+                          </Text>
+                        ) : null}
+                      </View>
+                    </TouchableOpacity>
+                  )}
+                />
+              )}
+            </View>
+
+            <View style={styles.discoverySection}>
+              <View style={styles.discoveryHeader}>
+                <View style={styles.discoveryHeaderText}>
+                  <Text style={styles.discoveryEyebrow}>
+                    BROWSE BY MAKER
+                  </Text>
+
+                  <Text style={styles.discoveryTitle}>
+                    Popular Brands
+                  </Text>
+
+                  <Text style={styles.discoverySubtitle}>
+                    Explore the flavor catalog by brand.
+                  </Text>
+                </View>
+
+                <View style={styles.discoveryIcon}>
+                  <Ionicons
+                    name="business-outline"
+                    size={19}
+                    color={theme.primary}
+                  />
+                </View>
+              </View>
+
+              {isLoadingFlavors && topBrands.length === 0 ? (
+                <View style={styles.discoveryLoading}>
+                  <ActivityIndicator
+                    size="small"
+                    color={theme.primary}
+                  />
+                </View>
+              ) : (
+                <FlatList
+                  horizontal
+                  data={topBrands}
+                  keyExtractor={(item) => item.id}
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.horizontalListContent}
+                  renderItem={({ item }) => (
+                    <TouchableOpacity
+                      style={styles.brandCard}
+                      activeOpacity={0.85}
+                      onPress={() =>
+                        router.push({
+                          pathname: "/brand/[id]",
+                          params: { id: item.id },
+                        })
+                      }
+                    >
+                      <View style={styles.brandLogoContainer}>
+                        {item.logoUrl ? (
+                          <Image
+                            source={{ uri: item.logoUrl }}
+                            style={styles.brandLogo}
+                          />
+                        ) : (
+                          <Text style={styles.brandInitial}>
+                            {item.name.charAt(0).toUpperCase()}
+                          </Text>
+                        )}
+                      </View>
+
+                      <Text
+                        style={styles.brandName}
+                        numberOfLines={1}
+                      >
+                        {item.name}
+                      </Text>
+
+                      <Text style={styles.brandFlavorCount}>
+                        {item.flavorCount}{" "}
+                        {item.flavorCount === 1
+                          ? "flavor"
+                          : "flavors"}
+                      </Text>
+
+                      <View style={styles.brandRatingRow}>
+                        <Ionicons
+                          name="star"
+                          size={12}
+                          color="#F4B740"
+                        />
+
+                        <Text style={styles.brandRatingText}>
+                          {item.ratingCount > 0
+                            ? item.averageRating.toFixed(1)
+                            : "New"}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  )}
+                />
+              )}
             </View>
 
             <View style={styles.sectionHeader}>
@@ -811,8 +1008,180 @@ function getStyles(theme: AppTheme) {
       padding: 4,
     },
 
+    discoverySection: {
+      marginTop: 26,
+    },
+
+    discoveryHeader: {
+      marginBottom: 14,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+    },
+
+    discoveryHeaderText: {
+      flex: 1,
+      paddingRight: 14,
+    },
+
+    discoveryEyebrow: {
+      fontSize: 9,
+      fontWeight: "900",
+      letterSpacing: 1.2,
+      color: theme.primary,
+    },
+
+    discoveryTitle: {
+      marginTop: 3,
+      fontSize: 19,
+      fontWeight: "800",
+      color: theme.text,
+    },
+
+    discoverySubtitle: {
+      marginTop: 3,
+      fontSize: 12,
+      color: theme.textSecondary,
+    },
+
+    discoveryIcon: {
+      width: 38,
+      height: 38,
+      alignItems: "center",
+      justifyContent: "center",
+      borderRadius: 13,
+      backgroundColor: theme.card,
+    },
+
+    discoveryLoading: {
+      height: 130,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+
+    horizontalListContent: {
+      paddingRight: 18,
+      gap: 12,
+    },
+
+    flavorCard: {
+      width: 150,
+      padding: 13,
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 20,
+      backgroundColor: theme.card,
+    },
+
+    flavorImageContainer: {
+      width: "100%",
+      height: 88,
+      alignItems: "center",
+      justifyContent: "center",
+      overflow: "hidden",
+      borderRadius: 15,
+      backgroundColor: theme.primaryLight,
+    },
+
+    flavorImage: {
+      width: "100%",
+      height: "100%",
+      resizeMode: "cover",
+    },
+
+    flavorName: {
+      marginTop: 11,
+      fontSize: 14,
+      fontWeight: "800",
+      color: theme.text,
+    },
+
+    flavorBrand: {
+      marginTop: 3,
+      fontSize: 11,
+      color: theme.textSecondary,
+    },
+
+    flavorStatsRow: {
+      marginTop: 9,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 4,
+    },
+
+    flavorRating: {
+      fontSize: 11,
+      fontWeight: "800",
+      color: theme.text,
+    },
+
+    flavorRatingCount: {
+      fontSize: 10,
+      color: theme.textSecondary,
+    },
+
+    brandCard: {
+      width: 132,
+      padding: 14,
+      alignItems: "center",
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 20,
+      backgroundColor: theme.card,
+    },
+
+    brandLogoContainer: {
+      width: 58,
+      height: 58,
+      alignItems: "center",
+      justifyContent: "center",
+      overflow: "hidden",
+      borderRadius: 19,
+      backgroundColor: theme.primaryLight,
+    },
+
+    brandLogo: {
+      width: "100%",
+      height: "100%",
+      resizeMode: "cover",
+    },
+
+    brandInitial: {
+      fontSize: 22,
+      fontWeight: "900",
+      color: theme.primaryDark,
+    },
+
+    brandName: {
+      marginTop: 11,
+      width: "100%",
+      fontSize: 13,
+      fontWeight: "800",
+      textAlign: "center",
+      color: theme.text,
+    },
+
+    brandFlavorCount: {
+      marginTop: 3,
+      fontSize: 10,
+      color: theme.textSecondary,
+    },
+
+    brandRatingRow: {
+      marginTop: 8,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 4,
+    },
+
+    brandRatingText: {
+      fontSize: 10,
+      fontWeight: "800",
+      color: theme.text,
+    },
+
     sectionHeader: {
-      marginTop: 24,
+      marginTop: 28,
       marginBottom: 14,
       flexDirection: "row",
       alignItems: "center",

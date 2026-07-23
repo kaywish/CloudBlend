@@ -29,6 +29,10 @@ export type Flavor = {
   slug: string
   description: string | null
   imageUrl: string | null
+  imageSource: string | null
+  imageCredit: string | null
+  imageLicense: string | null
+  imageApproved: boolean
   category: string | null
   strength: FlavorStrength | null
   isDarkLeaf: boolean
@@ -38,6 +42,8 @@ export type Flavor = {
   ratingCount: number
   favoriteCount: number
   publicMixCount: number
+
+  
 
   createdAt?: string
   updatedAt?: string
@@ -58,4 +64,33 @@ export type CreateFlavorRatingInput = {
   userId: string
   rating: number
   review?: string | null
+}
+
+export type FlavorImageSubmissionStatus =
+  | "pending"
+  | "approved"
+  | "rejected"
+
+export type FlavorImageSubmission = {
+  id: string
+  flavorId: string
+  submittedBy: string
+  imageUrl: string
+  storagePath: string
+  creditName: string | null
+  notes: string | null
+  status: FlavorImageSubmissionStatus
+  permissionConfirmed: boolean
+  isPrimary: boolean
+  reviewedBy: string | null
+  reviewedAt: string | null
+  createdAt: string
+}
+
+export type SubmitFlavorImageInput = {
+  flavorId: string
+  imageUri: string
+  creditName?: string
+  notes?: string
+  permissionConfirmed: boolean
 }
