@@ -19,6 +19,7 @@ export type UserProfile = {
   bio: string
   createdAt: string
   updatedAt: string
+  isAdmin: boolean
 }
 
 type ProfileUpdates = {
@@ -51,6 +52,7 @@ type ProfileRow = {
   bio: string | null
   created_at: string
   updated_at: string
+  is_admin: boolean
 }
 
 const ProfileContext =
@@ -65,6 +67,7 @@ function mapProfile(row: ProfileRow): UserProfile {
     bio: row.bio ?? "",
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    isAdmin: row.is_admin,
   }
 }
 
@@ -139,7 +142,8 @@ export function ProfileProvider({
             avatar_url,
             bio,
             created_at,
-            updated_at
+            updated_at,
+            is_admin
           `
         )
         .eq("id", user.id)
@@ -171,7 +175,8 @@ export function ProfileProvider({
                 avatar_url,
                 bio,
                 created_at,
-                updated_at
+                updated_at,
+                is_admin
               `
             )
             .single()
@@ -274,7 +279,8 @@ export function ProfileProvider({
               avatar_url,
               bio,
               created_at,
-              updated_at
+              updated_at,
+              is_admin
             `
           )
           .single()
@@ -375,7 +381,8 @@ export function ProfileProvider({
                 avatar_url,
                 bio,
                 created_at,
-                updated_at
+                updated_at,
+                is_admin
               `
             )
             .single()
@@ -450,7 +457,8 @@ export function ProfileProvider({
             avatar_url,
             bio,
             created_at,
-            updated_at
+            updated_at,
+            is_admin
           `
         )
         .single()

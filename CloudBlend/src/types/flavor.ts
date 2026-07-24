@@ -55,6 +55,9 @@ export type FlavorRating = {
   userId: string
   rating: number
   review: string | null
+  username?: string | null
+  displayName?: string | null
+  avatarUrl?: string | null
   createdAt: string
   updatedAt: string
 }
@@ -93,4 +96,28 @@ export type SubmitFlavorImageInput = {
   creditName?: string
   notes?: string
   permissionConfirmed: boolean
+}
+
+export type AdminFlavorImageSubmission = {
+  id: string
+  flavorId: string
+  flavorName: string
+  brandName: string | null
+
+  submittedBy: string
+  submitterName: string | null
+
+  imageUrl: string
+  storagePath: string
+
+  creditName: string | null
+  notes: string | null
+
+  status: "pending" | "approved" | "rejected"
+  permissionConfirmed: boolean
+  isPrimary: boolean
+
+  reviewedBy: string | null
+  reviewedAt: string | null
+  createdAt: string
 }

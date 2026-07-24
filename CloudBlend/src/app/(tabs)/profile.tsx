@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons"
 import * as ImagePicker from "expo-image-picker"
-import { router } from "expo-router"
-import { useEffect, useMemo, useState } from "react"
+import { router, useFocusEffect } from "expo-router"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import {
   ActivityIndicator,
   Alert,
@@ -23,6 +23,7 @@ import { useAuth } from "@/context/AuthContext"
 import { ThemeMode, useAppTheme } from "@/context/AppThemeContext"
 import { useMixes } from "@/context/MixContext"
 import { useProfile } from "@/context/ProfileContext"
+import { getUnreadNotificationCount } from "@/services/notificationService"
 
 function getInitials(
   displayName?: string,
@@ -97,6 +98,7 @@ export default function ProfileScreen() {
   const [displayName, setDisplayName] =
     useState("")
   const [bio, setBio] = useState("")
+  const [unreadCount, setUnreadCount] = useState(0)
 
   const publicMixCount = useMemo(
     () =>
@@ -117,6 +119,29 @@ export default function ProfileScreen() {
     setBio(profile.bio)
   }, [profile])
 
+  const loadUnreadCount = useCallback(async () => {
+    if (!user) {
+      setUnreadCount(0)
+      return
+    }
+
+    try {
+      const count = await getUnreadNotificationCount()
+      setUnreadCount(count)
+    } catch (error) {
+      console.error(
+        "Could not load unread notification count:",
+        error
+      )
+    }
+  }, [user])
+
+  useFocusEffect(
+    useCallback(() => {
+      void loadUnreadCount()
+    }, [loadUnreadCount])
+  )
+
   async function handleRefresh() {
     setIsRefreshing(true)
 
@@ -124,6 +149,7 @@ export default function ProfileScreen() {
       await Promise.all([
         refreshProfile(),
         refreshMixes(),
+        loadUnreadCount(),
       ])
     } catch {
       Alert.alert(
@@ -738,12 +764,53 @@ export default function ProfileScreen() {
 
         <View style={styles.accountSection}>
           <Text style={styles.sectionTitle}>
-            Appearance
+            Preferences
           </Text>
 
           <View style={styles.accountCard}>
             <TouchableOpacity
               style={styles.accountRow}
+              activeOpacity={0.8}
+              onPress={() => router.push("/notifications")}
+            >
+              <View style={styles.accountIcon}>
+                <Ionicons
+                  name="notifications-outline"
+                  size={21}
+                  color={palette.primary}
+                />
+              </View>
+
+              <View style={styles.accountText}>
+                <Text style={styles.accountLabel}>
+                  Notifications
+                </Text>
+                <Text style={styles.accountValue}>
+                  View approvals and account activity
+                </Text>
+              </View>
+
+              {unreadCount > 0 ? (
+                <View style={styles.notificationBadge}>
+                  <Text style={styles.notificationBadgeText}>
+                    {unreadCount > 99 ? "99+" : unreadCount}
+                  </Text>
+                </View>
+              ) : null}
+
+              <Ionicons
+                name="chevron-forward"
+                size={19}
+                color={palette.muted}
+                style={styles.accountChevron}
+              />
+            </TouchableOpacity>
+
+            <View style={styles.divider} />
+
+            <TouchableOpacity
+              style={styles.accountRow}
+              activeOpacity={0.8}
               onPress={() => setAppearanceVisible(true)}
             >
               <View style={styles.accountIcon}>
@@ -753,21 +820,25 @@ export default function ProfileScreen() {
                       ? "moon-outline"
                       : "sunny-outline"
                   }
-                  size={20}
+                  size={21}
                   color={palette.primary}
                 />
               </View>
 
               <View style={styles.accountText}>
                 <Text style={styles.accountLabel}>
-                  App Theme
+                  Appearance
                 </Text>
                 <Text style={styles.accountValue}>
                   {themeMode === "system"
-                    ? `System (${resolvedTheme})`
+                    ? `System (${
+                        resolvedTheme === "dark"
+                          ? "Dark"
+                          : "Light"
+                      })`
                     : themeMode === "dark"
-                    ? "Dark"
-                    : "Light"}
+                      ? "Dark"
+                      : "Light"}
                 </Text>
               </View>
 
@@ -804,12 +875,49 @@ export default function ProfileScreen() {
               </View>
             </View>
 
-            <View style={styles.divider} />
+            {profile?.isAdmin && (
+  <>
+    <View style={styles.divider} />
 
-            <TouchableOpacity
-              style={styles.accountRow}
-              onPress={handleSignOut}
-            >
+    <TouchableOpacity
+      style={styles.accountRow}
+      onPress={() => router.push("/admin/flavor-photos")}
+    >
+      <View style={styles.accountIcon}>
+        <Ionicons
+          name="images-outline"
+          size={20}
+          color={palette.primary}
+        />
+      </View>
+
+      <View style={styles.accountText}>
+        <Text style={styles.accountLabel}>
+          Review Flavor Photos
+        </Text>
+
+        <Text style={styles.accountValue}>
+          Approve or reject community submissions
+        </Text>
+      </View>
+
+      <Ionicons
+        name="chevron-forward"
+        size={19}
+        color={palette.muted}
+      />
+    </TouchableOpacity>
+  </>
+)}
+
+
+
+<View style={styles.divider} />
+
+<TouchableOpacity
+  style={styles.accountRow}
+  onPress={handleSignOut}
+>
               <View
                 style={[
                   styles.accountIcon,
@@ -1879,5 +1987,25 @@ function getStyles(palette: ProfilePalette) {
     textAlign: "right",
     color: palette.muted,
   },
+  notificationBadge: {
+    minWidth: 24,
+    height: 24,
+    paddingHorizontal: 7,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 12,
+    backgroundColor: palette.primary,
+  },
+
+  notificationBadgeText: {
+    fontSize: 11,
+    fontWeight: "900",
+    color: "#FFFFFF",
+  },
+
+  accountChevron: {
+    marginLeft: 10,
+  },
+  
 })
 }

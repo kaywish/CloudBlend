@@ -55,6 +55,14 @@ type FlavorRatingRow = {
   review: string | null
   created_at: string
   updated_at: string
+
+  profiles:
+    | {
+        username: string | null
+        display_name: string | null
+        avatar_url: string | null
+      }
+    | null
 }
 
 function toNumber(value: number | string | null | undefined): number {
@@ -123,6 +131,9 @@ function mapFlavorRatingRow(
     userId: row.user_id,
     rating: toNumber(row.rating),
     review: row.review,
+    username: row.profiles?.username ?? null,
+    displayName: row.profiles?.display_name ?? null,
+    avatarUrl: row.profiles?.avatar_url ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }
@@ -220,13 +231,19 @@ export async function fetchFlavorRatings(
         rating,
         review,
         created_at,
-        updated_at
+        updated_at,
+        profiles!flavor_ratings_user_id_profiles_fkey (
+          username,
+          display_name,
+          avatar_url
+        )
       `
     )
     .eq("flavor_id", flavorId)
     .order("created_at", { ascending: false })
 
   if (error) {
+    console.error("Could not fetch flavor ratings:", error)
     throw new Error(error.message)
   }
 
