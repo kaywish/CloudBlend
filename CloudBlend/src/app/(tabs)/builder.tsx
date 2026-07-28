@@ -20,7 +20,7 @@ import type { AppTheme } from "@/constants/colors"
 import { useAppTheme } from "@/context/AppThemeContext"
 import { useMixes } from "@/context/MixContext"
 import { useFlavors } from "@/context/FlavorContext"
-import type { Flavor } from "@/types"
+import type { Flavor } from "@/types/flavor"
 
 type SelectedFlavor = {
   flavor: Flavor
@@ -69,7 +69,13 @@ export default function BuilderScreen() {
   const editMixId = getSingleParam(params.editMixId)
   const requestedFlavorId = getSingleParam(params.flavorId)
 
-  const { saveMix, updateMix, getMixById } = useMixes()
+  const {
+  saveMix,
+  updateMix,
+  getMixById,
+  publicMixes,
+  refreshPublicMixes,
+} = useMixes()
   const {
     flavors: databaseFlavors,
     getFlavorById,
@@ -82,6 +88,7 @@ export default function BuilderScreen() {
   const [mixName, setMixName] = useState("")
   const [notes, setNotes] = useState("")
   const [isSaving, setIsSaving] = useState(false)
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false)
 
   const editingMix = editMixId ? getMixById(editMixId) : undefined
   const isEditing = Boolean(editingMix)
@@ -102,6 +109,159 @@ export default function BuilderScreen() {
     selectedFlavors.length <= 4 &&
     totalPercentage === 100 &&
     mixName.trim().length > 0
+
+    useEffect(() => {
+  if (publicMixes.length > 0) {
+    return
+  }
+
+  let isActive = true
+
+  async function loadSuggestionData() {
+    try {
+      if (isActive) {
+        setIsLoadingSuggestions(true)
+      }
+
+      await refreshPublicMixes()
+    } catch (error) {
+      console.error("Could not load smart suggestions:", error)
+    } finally {
+      if (isActive) {
+        setIsLoadingSuggestions(false)
+      }
+    }
+  }
+
+  loadSuggestionData()
+
+  return () => {
+    isActive = false
+  }
+}, [publicMixes.length, refreshPublicMixes])
+
+const smartSuggestions = useMemo(() => {
+  if (
+    selectedFlavors.length === 0 ||
+    selectedFlavors.length >= 4
+  ) {
+    return []
+  }
+
+  const selectedFlavorIds = new Set(
+    selectedFlavors.map((item) => item.flavor.id)
+  )
+
+  const suggestionScores = new Map<
+    string,
+    {
+      score: number
+      mixCount: number
+      likeCount: number
+    }
+  >()
+
+  publicMixes.forEach((mix) => {
+    const mixFlavorIds = new Set(
+      mix.ingredients.map(
+        (ingredient) => ingredient.flavorId
+      )
+    )
+
+    const matchingSelectedFlavors = Array.from(
+      selectedFlavorIds
+    ).filter((flavorId) =>
+      mixFlavorIds.has(flavorId)
+    ).length
+
+    if (matchingSelectedFlavors === 0) {
+      return
+    }
+
+    const mixLikes = Math.max(0, mix.likeCount ?? 0)
+
+    mix.ingredients.forEach((ingredient) => {
+      if (selectedFlavorIds.has(ingredient.flavorId)) {
+        return
+      }
+
+      const current =
+        suggestionScores.get(ingredient.flavorId) ?? {
+          score: 0,
+          mixCount: 0,
+          likeCount: 0,
+        }
+
+      current.mixCount += 1
+      current.likeCount += mixLikes
+
+      /*
+       * Flavors receive a higher score when:
+       * 1. They appear with more of the currently selected flavors.
+       * 2. The community mix has more likes.
+       */
+      current.score +=
+        matchingSelectedFlavors * 10 +
+        Math.min(mixLikes, 25)
+
+      suggestionScores.set(
+        ingredient.flavorId,
+        current
+      )
+    })
+  })
+
+  return Array.from(suggestionScores.entries())
+    .map(([flavorId, stats]) => {
+      const flavor = databaseFlavors.find(
+        (item) => item.id === flavorId
+      )
+
+      if (!flavor) {
+        return null
+      }
+
+      return {
+        flavor,
+        score: stats.score,
+        mixCount: stats.mixCount,
+        likeCount: stats.likeCount,
+      }
+    })
+    .filter(
+      (
+        suggestion
+      ): suggestion is {
+        flavor: Flavor
+        score: number
+        mixCount: number
+        likeCount: number
+      } => suggestion !== null
+    )
+    .sort((a, b) => {
+      if (b.score !== a.score) {
+        return b.score - a.score
+      }
+
+      if (b.mixCount !== a.mixCount) {
+        return b.mixCount - a.mixCount
+      }
+
+      if (b.likeCount !== a.likeCount) {
+        return b.likeCount - a.likeCount
+      }
+
+      return (
+        (b.flavor.averageRating ?? 0) -
+        (a.flavor.averageRating ?? 0)
+      )
+    })
+    .slice(0, 4)
+}, [
+  databaseFlavors,
+  publicMixes,
+  selectedFlavors,
+])
 
   const filteredFlavors = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase()
@@ -601,6 +761,126 @@ export default function BuilderScreen() {
           </TouchableOpacity>
         ) : null}
 
+        {selectedFlavors.length > 0 &&
+selectedFlavors.length < 4 ? (
+  <View style={styles.suggestionSection}>
+    <View style={styles.suggestionHeader}>
+      <View>
+        <Text style={styles.suggestionEyebrow}>
+          SMART SUGGESTIONS
+        </Text>
+
+        <Text style={styles.suggestionTitle}>
+          Popular additions
+        </Text>
+      </View>
+
+      <View style={styles.suggestionBadge}>
+        <Ionicons
+          name="sparkles"
+          size={14}
+          color={theme.primary}
+        />
+
+        <Text style={styles.suggestionBadgeText}>
+          Community
+        </Text>
+      </View>
+    </View>
+
+    {isLoadingSuggestions ? (
+      <View style={styles.suggestionMessageCard}>
+        <Ionicons
+          name="hourglass-outline"
+          size={20}
+          color={theme.primary}
+        />
+
+        <Text style={styles.suggestionMessageText}>
+          Finding flavors that work with your selection...
+        </Text>
+      </View>
+    ) : smartSuggestions.length > 0 ? (
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.suggestionList}
+      >
+        {smartSuggestions.map((suggestion) => (
+          <TouchableOpacity
+            key={suggestion.flavor.id}
+            style={styles.suggestionCard}
+            activeOpacity={0.85}
+            onPress={() =>
+              addFlavor(suggestion.flavor)
+            }
+          >
+            <Image
+              source={{
+                uri: suggestion.flavor.imageUrl,
+              }}
+              style={styles.suggestionImage}
+            />
+
+            <View style={styles.suggestionContent}>
+              <Text
+                style={styles.suggestionFlavorName}
+                numberOfLines={1}
+              >
+                {suggestion.flavor.name}
+              </Text>
+
+              <Text
+                style={styles.suggestionBrand}
+                numberOfLines={1}
+              >
+                {getFlavorBrandName(
+                  suggestion.flavor
+                )}
+              </Text>
+
+              <Text style={styles.suggestionReason}>
+                Used in {suggestion.mixCount}{" "}
+                {suggestion.mixCount === 1
+                  ? "community mix"
+                  : "community mixes"}
+              </Text>
+            </View>
+
+            <View style={styles.suggestionAddButton}>
+              <Ionicons
+                name="add"
+                size={18}
+                color="#FFFFFF"
+              />
+            </View>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+    ) : (
+      <View style={styles.suggestionMessageCard}>
+        <Ionicons
+          name="analytics-outline"
+          size={21}
+          color={theme.primary}
+        />
+
+        <View style={styles.suggestionMessageContent}>
+          <Text style={styles.suggestionMessageTitle}>
+            Suggestions are still learning
+          </Text>
+
+          <Text style={styles.suggestionMessageText}>
+            Recommendations will appear as the
+            community publishes more mixes using these
+            flavors.
+          </Text>
+        </View>
+      </View>
+    )}
+  </View>
+) : null}
+
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Mix Details</Text>
         </View>
@@ -666,7 +946,7 @@ export default function BuilderScreen() {
                   >
                     <View style={styles.previewFlavorInfo}>
                       <Image
-                        source={{ uri: item.flavor.image }}
+                        source={{ uri: item.flavor.imageUrl }}
                         style={styles.previewFlavorImage}
                       />
 
@@ -750,7 +1030,7 @@ function SelectedFlavorCard({
     <View style={styles.selectedFlavorCard}>
       <View style={styles.selectedFlavorHeader}>
         <Image
-          source={{ uri: item.flavor.image }}
+          source={{ uri: item.flavor.imageUrl }}
           style={styles.selectedFlavorImage}
         />
 
@@ -896,7 +1176,7 @@ function FlavorPickerModal({
               onPress={() => onSelect(item)}
             >
               <Image
-                source={{ uri: item.image }}
+                source={{ uri: item.imageUrl }}
                 style={styles.modalFlavorImage}
               />
 
@@ -1702,6 +1982,134 @@ editingBannerText: {
   fontSize: 13,
   fontWeight: "700",
   color: theme.primaryDark,
+},
+suggestionSection: {
+  marginTop: 27,
+},
+
+suggestionHeader: {
+  paddingHorizontal: 18,
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "space-between",
+},
+
+suggestionEyebrow: {
+  fontSize: 10,
+  fontWeight: "800",
+  letterSpacing: 1,
+  color: theme.primary,
+},
+
+suggestionTitle: {
+  marginTop: 3,
+  fontSize: 18,
+  fontWeight: "700",
+  color: theme.text,
+},
+
+suggestionBadge: {
+  paddingHorizontal: 10,
+  paddingVertical: 6,
+  flexDirection: "row",
+  alignItems: "center",
+  gap: 5,
+  borderRadius: 13,
+  backgroundColor: theme.primaryLight,
+},
+
+suggestionBadgeText: {
+  fontSize: 10,
+  fontWeight: "700",
+  color: theme.primaryDark,
+},
+
+suggestionList: {
+  paddingHorizontal: 18,
+  paddingTop: 13,
+  paddingBottom: 2,
+  gap: 11,
+},
+
+suggestionCard: {
+  width: 235,
+  padding: 11,
+  flexDirection: "row",
+  alignItems: "center",
+  borderWidth: 1,
+  borderColor: theme.border,
+  borderRadius: 17,
+  backgroundColor: theme.card,
+},
+
+suggestionImage: {
+  width: 58,
+  height: 58,
+  borderRadius: 12,
+  backgroundColor: theme.surface,
+},
+
+suggestionContent: {
+  flex: 1,
+  marginLeft: 10,
+},
+
+suggestionFlavorName: {
+  fontSize: 13,
+  fontWeight: "700",
+  color: theme.text,
+},
+
+suggestionBrand: {
+  marginTop: 2,
+  fontSize: 10,
+  color: theme.textSecondary,
+},
+
+suggestionReason: {
+  marginTop: 5,
+  fontSize: 9,
+  fontWeight: "600",
+  color: theme.primary,
+},
+
+suggestionAddButton: {
+  width: 30,
+  height: 30,
+  alignItems: "center",
+  justifyContent: "center",
+  borderRadius: 15,
+  backgroundColor: theme.primary,
+},
+
+suggestionMessageCard: {
+  marginHorizontal: 18,
+  marginTop: 13,
+  padding: 15,
+  flexDirection: "row",
+  alignItems: "flex-start",
+  gap: 11,
+  borderWidth: 1,
+  borderColor: theme.border,
+  borderRadius: 17,
+  backgroundColor: theme.card,
+},
+
+suggestionMessageContent: {
+  flex: 1,
+},
+
+suggestionMessageTitle: {
+  fontSize: 13,
+  fontWeight: "700",
+  color: theme.text,
+},
+
+suggestionMessageText: {
+  flex: 1,
+  fontSize: 11,
+  lineHeight: 17,
+  color: theme.textSecondary,
 },
 
   

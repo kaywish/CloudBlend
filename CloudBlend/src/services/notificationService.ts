@@ -24,7 +24,13 @@ export async function createNotification({
   type: string
   data?: Record<string, unknown>
 }): Promise<void> {
-  const { error } = await supabase
+  console.log("Creating notification for user:", {
+    userId,
+    title,
+    type,
+  })
+
+  const { data: insertedNotification, error } = await supabase
     .from("notifications")
     .insert({
       user_id: userId,
@@ -34,15 +40,32 @@ export async function createNotification({
       data: data ?? {},
       is_read: false,
     })
+    .select(`
+      id,
+      user_id,
+      title,
+      type,
+      is_read,
+      created_at
+    `)
+    .single()
 
   if (error) {
+    console.error("Notification insert failed:", error)
     throw new Error(error.message)
   }
+
+  console.log(
+    "Notification successfully inserted:",
+    insertedNotification
+  )
 }
 
 export async function fetchNotifications(): Promise<
   AppNotification[]
 > {
+  const userId = await getCurrentUserId()
+
   const { data, error } = await supabase
     .from("notifications")
     .select(`
@@ -55,6 +78,7 @@ export async function fetchNotifications(): Promise<
       is_read,
       created_at
     `)
+    .eq("user_id", userId)
     .order("created_at", {
       ascending: false,
     })
@@ -78,31 +102,39 @@ export async function fetchNotifications(): Promise<
 export async function markNotificationRead(
   notificationId: string
 ): Promise<void> {
+  const userId = await getCurrentUserId()
+
   const { error } = await supabase
     .from("notifications")
     .update({
       is_read: true,
     })
     .eq("id", notificationId)
+    .eq("user_id", userId)
 
   if (error) {
     throw new Error(error.message)
   }
 }
 
-export async function markAllNotificationsRead(): Promise<void> {
-  const { data: authData, error: authError } =
-    await supabase.auth.getUser()
+async function getCurrentUserId(): Promise<string> {
+  const { data, error } = await supabase.auth.getUser()
 
-  if (authError) {
-    throw new Error(authError.message)
+  if (error) {
+    throw new Error(error.message)
   }
 
-  const userId = authData.user?.id
+  const userId = data.user?.id
 
   if (!userId) {
     throw new Error("You must be signed in.")
   }
+
+  return userId
+}
+
+export async function markAllNotificationsRead(): Promise<void> {
+  const userId = await getCurrentUserId()
 
   const { error } = await supabase
     .from("notifications")
@@ -118,12 +150,15 @@ export async function markAllNotificationsRead(): Promise<void> {
 }
 
 export async function getUnreadNotificationCount(): Promise<number> {
+  const userId = await getCurrentUserId()
+
   const { count, error } = await supabase
     .from("notifications")
     .select("id", {
       count: "exact",
       head: true,
     })
+    .eq("user_id", userId)
     .eq("is_read", false)
 
   if (error) {

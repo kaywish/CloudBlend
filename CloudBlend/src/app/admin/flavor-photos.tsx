@@ -182,13 +182,15 @@ async function handleApprove(
     setProcessingId(submission.id)
 
     await approveFlavorImage({
-      submissionId: submission.id,
-      flavorId: submission.flavorId,
-      imageUrl: submission.imageUrl,
-      makePrimary,
-      creditName: submission.creditName,
-      submitterName: submission.submitterName,
-    })
+  submissionId: submission.id,
+  flavorId: submission.flavorId,
+  flavorName: submission.flavorName,
+  submittedBy: submission.submittedBy,
+  imageUrl: submission.imageUrl,
+  makePrimary,
+  creditName: submission.creditName,
+  submitterName: submission.submitterName,
+})
 
     setSubmissions((current) =>
       current.filter((item) => item.id !== submission.id)

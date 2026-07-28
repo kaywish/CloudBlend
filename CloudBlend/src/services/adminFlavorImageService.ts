@@ -14,31 +14,31 @@ type SubmissionProfileRow = {
 type SubmissionRow = {
   id: string
   flavor_id: string
-  submitted_by: string
+  submitted_by: string | null
   image_url: string
-  storage_path: string
+  storage_path: string | null
   credit_name: string | null
   notes: string | null
-  status: "pending" | "approved" | "rejected"
   permission_confirmed: boolean
+  status: string
   is_primary: boolean
   reviewed_by: string | null
   reviewed_at: string | null
   created_at: string
 
-  flavors:
-    | {
-        id: string
-        name: string
-        brands:
-          | {
-              name: string
-            }
-          | null
-      }
-    | null
+  flavors: {
+    id: string
+    name: string
+    brands: {
+      name: string
+    } | null
+  } | null
 
-  profiles: SubmissionProfileRow | null
+  profiles: {
+    username: string | null
+    display_name: string | null
+    avatar_url: string | null
+  } | null
 }
 
 type ApproveFlavorImageInput = {
@@ -60,40 +60,32 @@ type RejectFlavorImageInput = {
 function mapSubmission(
   row: SubmissionRow
 ): AdminFlavorImageSubmission {
-  const submitterName =
-    row.profiles?.display_name ??
-    row.profiles?.username ??
-    "CloudBlend user"
-
   return {
     id: row.id,
-
     flavorId: row.flavor_id,
-    flavorName: row.flavors?.name ?? "Unknown flavor",
-    brandName: row.flavors?.brands?.name ?? null,
-
     submittedBy: row.submitted_by,
-    submitterName,
-
-    submitterUsername: row.profiles?.username ?? null,
-    submitterDisplayName:
-      row.profiles?.display_name ?? null,
-    submitterAvatarUrl:
-      row.profiles?.avatar_url ?? null,
-
     imageUrl: row.image_url,
     storagePath: row.storage_path,
-
     creditName: row.credit_name,
     notes: row.notes,
-
-    status: row.status,
     permissionConfirmed: row.permission_confirmed,
+    status: row.status,
     isPrimary: row.is_primary,
-
     reviewedBy: row.reviewed_by,
     reviewedAt: row.reviewed_at,
     createdAt: row.created_at,
+
+    flavorName: row.flavors?.name ?? "Unknown flavor",
+    brandName:
+      row.flavors?.brands?.name ?? "Unknown brand",
+
+    submitterName:
+      row.profiles?.display_name ??
+      row.profiles?.username ??
+      "CloudBlend user",
+
+    submitterAvatarUrl:
+      row.profiles?.avatar_url ?? null,
   }
 }
 
@@ -212,10 +204,7 @@ export async function approveFlavorImage({
     }
   }
 
-  const {
-    data: updatedSubmission,
-    error: approvalError,
-  } = await supabase
+  const { error: approvalError } = await supabase
     .from("flavor_image_submissions")
     .update({
       status: "approved",
@@ -224,18 +213,9 @@ export async function approveFlavorImage({
       reviewed_at: reviewedAt,
     })
     .eq("id", submissionId)
-    .eq("status", "pending")
-    .select("id")
-    .maybeSingle()
 
   if (approvalError) {
     throw new Error(approvalError.message)
-  }
-
-  if (!updatedSubmission) {
-    throw new Error(
-      "This submission is no longer pending or could not be found."
-    )
   }
 
   if (makePrimary) {
@@ -243,13 +223,6 @@ export async function approveFlavorImage({
       .from("flavors")
       .update({
         image_url: imageUrl,
-        image_source: "community",
-        image_credit:
-          creditName?.trim() ||
-          submitterName?.trim() ||
-          null,
-        image_license: "community-submission",
-        image_approved: true,
       })
       .eq("id", flavorId)
 
@@ -258,21 +231,24 @@ export async function approveFlavorImage({
     }
   }
 
+  if (!submittedBy) {
+    console.warn(
+      `Approved photo ${submissionId}, but no submittedBy user ID was available.`
+    )
+
+    return
+  }
+
   await createNotification({
-    userId: submittedBy,
-    title: makePrimary
-      ? "Photo Selected as Main Image"
-      : "Photo Approved",
-    message: makePrimary
-      ? `Your photo of ${flavorName} was approved and selected as the main image.`
-      : `Your photo of ${flavorName} was approved and added to the community gallery.`,
-    type: "photo-approved",
-    data: {
-      flavorId,
-      submissionId,
-      makePrimary,
-    },
-  })
+  userId: submittedBy,
+  type: "flavor_photo_approved",
+  title: "Photo Approved",
+  message: `Your photo submission for ${flavorName} was approved.`,
+  data: {
+    flavorId,
+    submissionId,
+  },
+})
 }
 
 export async function rejectFlavorImage({

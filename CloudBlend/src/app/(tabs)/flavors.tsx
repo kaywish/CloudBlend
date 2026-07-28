@@ -1,9 +1,16 @@
 import { Ionicons } from "@expo/vector-icons"
-import { router } from "expo-router"
-import { useMemo, useState } from "react"
+import { useLocalSearchParams , router } from "expo-router"
 import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react"
+import {
+  ActivityIndicator,
   FlatList,
   Image,
+  RefreshControl,
   StyleSheet,
   Text,
   TextInput,
@@ -14,40 +21,139 @@ import { SafeAreaView } from "react-native-safe-area-context"
 
 import type { AppTheme } from "@/constants/colors"
 import { useAppTheme } from "@/context/AppThemeContext"
-import { flavors } from "@/data/flavors"
-import { Flavor, FlavorCategory } from "@/types"
-
-const categories: Array<FlavorCategory | "All"> = [
-  "All",
-  "Fruity",
-  "Minty",
-  "Sweet",
-  "Citrus",
-  "Creamy",
-  "Spiced",
-]
+import { fetchFlavorStatistics } from "@/services/flavorService"
+import type { Flavor } from "@/types/flavor"
 
 const categoryIcons: Record<
-  FlavorCategory | "All",
+  string,
   keyof typeof Ionicons.glyphMap
 > = {
   All: "grid-outline",
   Fruity: "nutrition-outline",
+  Fruit: "nutrition-outline",
   Minty: "leaf-outline",
+  Mint: "leaf-outline",
   Sweet: "ice-cream-outline",
   Citrus: "sunny-outline",
   Creamy: "water-outline",
+  Cream: "water-outline",
   Spiced: "flame-outline",
+  Spice: "flame-outline",
 }
 
+
+  
 export default function FlavorsScreen() {
   const { theme } = useAppTheme()
   const styles = useMemo(() => getStyles(theme), [theme])
+  const params = useLocalSearchParams<{
+    category?: string | string[]
+  }>()
 
+  const requestedCategory = Array.isArray(params.category)
+    ? params.category[0]
+    : params.category
+  const [flavors, setFlavors] = useState<Flavor[]>([])
   const [search, setSearch] = useState("")
-  const [selectedCategory, setSelectedCategory] = useState<
-    FlavorCategory | "All"
-  >("All")
+  const [selectedCategory, setSelectedCategory] =
+    useState("All")
+
+  const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+  const [errorMessage, setErrorMessage] = useState<
+    string | null
+  >(null)
+
+
+
+  const loadFlavors = useCallback(
+    async (isRefresh = false) => {
+      try {
+        setErrorMessage(null)
+
+        if (isRefresh) {
+          setRefreshing(true)
+        } else {
+          setLoading(true)
+        }
+
+        const databaseFlavors =
+          await fetchFlavorStatistics()
+
+        setFlavors(databaseFlavors)
+      } catch (error) {
+        console.error("Could not load flavors:", error)
+
+        setErrorMessage(
+          error instanceof Error
+            ? error.message
+            : "Could not load the flavor library."
+        )
+      } finally {
+        setLoading(false)
+        setRefreshing(false)
+      }
+    },
+    []
+  )
+
+ useEffect(() => {
+  loadFlavors()
+}, [loadFlavors])
+
+const categories = useMemo(() => {
+  const availableCategories = flavors
+    .map((flavor) => flavor.category?.trim())
+    .filter(
+      (category): category is string =>
+        Boolean(category)
+    )
+
+  return [
+    "All",
+    ...Array.from(
+      new Set(availableCategories)
+    ).sort((first, second) =>
+      first.localeCompare(second)
+    ),
+  ]
+}, [flavors])
+
+useEffect(() => {
+  if (!requestedCategory || loading) return
+
+  const matchingCategory = categories.find(
+    (category) =>
+      category.toLowerCase() ===
+      requestedCategory.toLowerCase()
+  )
+
+  if (matchingCategory) {
+    setSelectedCategory(matchingCategory)
+  }
+}, [requestedCategory, categories, loading])
+
+useEffect(() => {
+  if (loading || flavors.length === 0) return
+
+  const categoryExists = categories.some(
+    (category) =>
+      category.toLowerCase() ===
+      selectedCategory.toLowerCase()
+  )
+
+  if (
+    selectedCategory !== "All" &&
+    !categoryExists
+  ) {
+    setSelectedCategory("All")
+  }
+}, [
+  categories,
+  selectedCategory,
+  loading,
+  flavors.length,
+])
 
   const filteredFlavors = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase()
@@ -55,19 +161,27 @@ export default function FlavorsScreen() {
     return flavors.filter((flavor) => {
       const matchesSearch =
         normalizedSearch.length === 0 ||
-        flavor.name.toLowerCase().includes(normalizedSearch) ||
-        flavor.brand.toLowerCase().includes(normalizedSearch) ||
-        flavor.categories.some((category) =>
-          category.toLowerCase().includes(normalizedSearch)
-        )
+        flavor.name
+          .toLowerCase()
+          .includes(normalizedSearch) ||
+        flavor.brandName
+          .toLowerCase()
+          .includes(normalizedSearch) ||
+        flavor.category
+          ?.toLowerCase()
+          .includes(normalizedSearch) ||
+        flavor.description
+          ?.toLowerCase()
+          .includes(normalizedSearch)
 
       const matchesCategory =
-        selectedCategory === "All" ||
-        flavor.categories.includes(selectedCategory)
+  selectedCategory === "All" ||
+  flavor.category?.toLowerCase() ===
+    selectedCategory.toLowerCase()
 
       return matchesSearch && matchesCategory
     })
-  }, [search, selectedCategory])
+  }, [flavors, search, selectedCategory])
 
   function openFlavor(flavor: Flavor) {
     router.push({
@@ -83,12 +197,83 @@ export default function FlavorsScreen() {
     setSelectedCategory("All")
   }
 
+  if (loading) {
+    return (
+      <SafeAreaView
+        style={styles.safeArea}
+        edges={["top"]}
+      >
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator
+            size="large"
+            color={theme.primary}
+          />
+
+          <Text style={styles.loadingTitle}>
+            Loading flavors
+          </Text>
+
+          <Text style={styles.loadingText}>
+            Getting the latest flavors and brands.
+          </Text>
+        </View>
+      </SafeAreaView>
+    )
+  }
+
+  if (errorMessage && flavors.length === 0) {
+    return (
+      <SafeAreaView
+        style={styles.safeArea}
+        edges={["top"]}
+      >
+        <View style={styles.loadingContainer}>
+          <View style={styles.emptyIcon}>
+            <Ionicons
+              name="cloud-offline-outline"
+              size={36}
+              color={theme.primary}
+            />
+          </View>
+
+          <Text style={styles.emptyTitle}>
+            Could not load flavors
+          </Text>
+
+          <Text style={styles.emptyText}>
+            {errorMessage}
+          </Text>
+
+          <TouchableOpacity
+            style={styles.resetButton}
+            onPress={() => loadFlavors()}
+          >
+            <Text style={styles.resetButtonText}>
+              Try again
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    )
+  }
+
   return (
-    <SafeAreaView style={styles.safeArea} edges={["top"]}>
+    <SafeAreaView
+      style={styles.safeArea}
+      edges={["top"]}
+    >
       <FlatList
         data={filteredFlavors}
         keyExtractor={(item) => item.id}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => loadFlavors(true)}
+            tintColor={theme.primary}
+          />
+        }
         contentContainerStyle={[
           styles.listContent,
           filteredFlavors.length === 0 &&
@@ -115,8 +300,12 @@ export default function FlavorsScreen() {
                     size={14}
                     color="#FFFFFF"
                   />
+
                   <Text style={styles.heroCountText}>
-                    {flavors.length} flavors
+                    {flavors.length}{" "}
+                    {flavors.length === 1
+                      ? "flavor"
+                      : "flavors"}
                   </Text>
                 </View>
               </View>
@@ -126,8 +315,8 @@ export default function FlavorsScreen() {
               </Text>
 
               <Text style={styles.heroSubtitle}>
-                Browse the CloudBlend library and find the perfect
-                combination for your next mix.
+                Browse the CloudBlend library and find
+                the perfect combination for your next mix.
               </Text>
             </View>
 
@@ -171,7 +360,9 @@ export default function FlavorsScreen() {
                 data={categories}
                 keyExtractor={(item) => item}
                 showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.categoryList}
+                contentContainerStyle={
+                  styles.categoryList
+                }
                 style={styles.categoryScroll}
                 renderItem={({ item }) => {
                   const isSelected =
@@ -189,7 +380,10 @@ export default function FlavorsScreen() {
                       ]}
                     >
                       <Ionicons
-                        name={categoryIcons[item]}
+                        name={
+                          categoryIcons[item] ??
+                          "pricetag-outline"
+                        }
                         size={15}
                         color={
                           isSelected
@@ -257,8 +451,8 @@ export default function FlavorsScreen() {
             </Text>
 
             <Text style={styles.emptyText}>
-              Try another search term or choose a different
-              category.
+              Try another search term or choose a
+              different category.
             </Text>
 
             <TouchableOpacity
@@ -296,10 +490,21 @@ function FlavorCard({
       onPress={onPress}
     >
       <View style={styles.imageWrap}>
-        <Image
-          source={{ uri: flavor.image }}
-          style={styles.flavorImage}
-        />
+        {flavor.imageUrl ? (
+          <Image
+            source={{ uri: flavor.imageUrl }}
+            style={styles.flavorImage}
+            resizeMode="cover"
+          />
+        ) : (
+          <View style={styles.flavorImagePlaceholder}>
+            <Ionicons
+              name="leaf-outline"
+              size={34}
+              color={theme.primary}
+            />
+          </View>
+        )}
 
         <View style={styles.ratingPill}>
           <Ionicons
@@ -324,9 +529,22 @@ function FlavorCard({
               {flavor.name}
             </Text>
 
-            <Text style={styles.flavorBrand}>
-              {flavor.brand}
-            </Text>
+            <View style={styles.brandRow}>
+              {flavor.brandLogoUrl ? (
+                <Image
+                  source={{ uri: flavor.brandLogoUrl }}
+                  style={styles.brandLogo}
+                  resizeMode="contain"
+                />
+              ) : null}
+
+              <Text
+                style={styles.flavorBrand}
+                numberOfLines={1}
+              >
+                {flavor.brandName}
+              </Text>
+            </View>
           </View>
 
           <View style={styles.chevronButton}>
@@ -339,13 +557,29 @@ function FlavorCard({
         </View>
 
         <View style={styles.tagContainer}>
-          {flavor.categories.slice(0, 3).map((category) => (
-            <View key={category} style={styles.categoryTag}>
+          {flavor.category ? (
+            <View style={styles.categoryTag}>
               <Text style={styles.categoryTagText}>
-                {category}
+                {flavor.category}
               </Text>
             </View>
-          ))}
+          ) : null}
+
+          {flavor.strength ? (
+            <View style={styles.categoryTag}>
+              <Text style={styles.categoryTagText}>
+                {formatStrength(flavor.strength)}
+              </Text>
+            </View>
+          ) : null}
+
+          {flavor.isDarkLeaf ? (
+            <View style={styles.categoryTag}>
+              <Text style={styles.categoryTagText}>
+                Dark leaf
+              </Text>
+            </View>
+          ) : null}
         </View>
 
         <View style={styles.cardFooter}>
@@ -365,6 +599,14 @@ function FlavorCard({
   )
 }
 
+function formatStrength(
+  strength: "light" | "medium" | "strong"
+) {
+  return (
+    strength.charAt(0).toUpperCase() +
+    strength.slice(1)
+  )
+}
 function getStyles(theme: AppTheme) {
   return StyleSheet.create({
     safeArea: {
@@ -742,5 +984,48 @@ function getStyles(theme: AppTheme) {
       fontWeight: "800",
       color: "#FFFFFF",
     },
+    loadingContainer: {
+  flex: 1,
+  paddingHorizontal: 30,
+  alignItems: "center",
+  justifyContent: "center",
+},
+
+loadingTitle: {
+  marginTop: 18,
+  fontSize: 20,
+  fontWeight: "900",
+  color: theme.text,
+},
+
+loadingText: {
+  marginTop: 7,
+  fontSize: 14,
+  textAlign: "center",
+  color: theme.textSecondary,
+},
+
+flavorImagePlaceholder: {
+  width: 106,
+  height: 110,
+  alignItems: "center",
+  justifyContent: "center",
+  borderRadius: 17,
+  backgroundColor: theme.primaryLight,
+},
+
+brandRow: {
+  maxWidth: "100%",
+  marginTop: 4,
+  flexDirection: "row",
+  alignItems: "center",
+  gap: 6,
+},
+
+brandLogo: {
+  width: 18,
+  height: 18,
+  borderRadius: 5,
+},
   })
 }
