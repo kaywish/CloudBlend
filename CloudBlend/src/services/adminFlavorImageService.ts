@@ -239,6 +239,21 @@ export async function approveFlavorImage({
     return
   }
 
+  const {
+  data: adminResult,
+  error: adminError,
+} = await supabase.rpc("is_admin")
+
+const {
+  data: sessionResult,
+} = await supabase.auth.getSession()
+
+console.log("ADMIN DEBUG:", {
+  isAdmin: adminResult,
+  adminError,
+  loggedInUserId: sessionResult.session?.user.id,
+})
+
   await createNotification({
   userId: submittedBy,
   type: "flavor_photo_approved",

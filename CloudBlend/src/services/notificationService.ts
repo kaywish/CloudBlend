@@ -30,35 +30,23 @@ export async function createNotification({
     type,
   })
 
-  const { data: insertedNotification, error } = await supabase
-    .from("notifications")
-    .insert({
-      user_id: userId,
-      title,
-      message,
-      type,
-      data: data ?? {},
-      is_read: false,
-    })
-    .select(`
-      id,
-      user_id,
-      title,
-      type,
-      is_read,
-      created_at
-    `)
-    .single()
+const { error } = await supabase
+  .from("notifications")
+  .insert({
+    user_id: userId,
+    title,
+    message,
+    type,
+    data: data ?? {},
+    is_read: false,
+  })
 
-  if (error) {
-    console.error("Notification insert failed:", error)
-    throw new Error(error.message)
-  }
+if (error) {
+  console.error("Notification insert failed:", error)
+  throw new Error(error.message)
+}
 
-  console.log(
-    "Notification successfully inserted:",
-    insertedNotification
-  )
+console.log("Notification created successfully")
 }
 
 export async function fetchNotifications(): Promise<

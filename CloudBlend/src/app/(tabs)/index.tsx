@@ -115,7 +115,7 @@ const [unreadCount, setUnreadCount] = useState(0)
     const count = await getUnreadNotificationCount()
     setUnreadCount(count)
   } catch (error) {
-    console.error(error)
+    console.log(error)
   }
 }, [])
 

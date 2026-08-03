@@ -2,6 +2,10 @@ import { Ionicons } from "@expo/vector-icons"
 import Slider from "@react-native-community/slider"
 import { router, useLocalSearchParams } from "expo-router"
 import { useEffect, useMemo, useState } from "react"
+import SuggestCatalogModal, {
+  type CatalogBrandOption,
+} from "@/components/SuggestCatalogModal"
+import { useAuth } from "@/context/AuthContext"
 import {
   Alert,
   FlatList,
@@ -12,6 +16,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  Platform,
   View,
 } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
@@ -64,6 +69,8 @@ function getFlavorBrandName(flavor: Flavor): string {
 export default function BuilderScreen() {
   const { theme } = useAppTheme()
   const styles = useMemo(() => getStyles(theme), [theme])
+  const { user } = useAuth()
+const isSignedIn = Boolean(user)
 
   const params = useLocalSearchParams<BuilderParams>()
   const editMixId = getSingleParam(params.editMixId)
@@ -84,6 +91,13 @@ export default function BuilderScreen() {
 
   const [selectedFlavors, setSelectedFlavors] = useState<SelectedFlavor[]>([])
   const [showFlavorPicker, setShowFlavorPicker] = useState(false)
+
+  const [
+  showCatalogSubmission,
+  setShowCatalogSubmission,
+] = useState(false)
+
+
   const [search, setSearch] = useState("")
   const [mixName, setMixName] = useState("")
   const [notes, setNotes] = useState("")
@@ -282,6 +296,38 @@ const smartSuggestions = useMemo(() => {
     })
   }, [databaseFlavors, search, selectedFlavors])
 
+
+  const availableBrands =
+  useMemo<CatalogBrandOption[]>(() => {
+    const brandMap = new Map<
+      string,
+      CatalogBrandOption
+    >()
+
+    databaseFlavors.forEach((flavor) => {
+      const brandId = flavor.brandId
+      const brandName =
+        getFlavorBrandName(flavor)
+
+      if (!brandId || !brandName) {
+        return
+      }
+
+      if (!brandMap.has(brandId)) {
+        brandMap.set(brandId, {
+          id: brandId,
+          name: brandName,
+        })
+      }
+    })
+
+    return Array.from(
+      brandMap.values()
+    ).sort((a, b) =>
+      a.name.localeCompare(b.name)
+    )
+  }, [databaseFlavors])
+
   /*
    * Restore an existing mix when this screen is opened in edit mode.
    * The flavorId route parameter is intentionally ignored while editing.
@@ -327,9 +373,9 @@ const smartSuggestions = useMemo(() => {
    * automatically begin the new mix with that flavor selected.
    */
   useEffect(() => {
-    if (isEditing || !requestedFlavorId) {
-      return
-    }
+   if (!user || isEditing || !requestedFlavorId) {
+  return
+}
 
     let isActive = true
 
@@ -380,9 +426,78 @@ const smartSuggestions = useMemo(() => {
     isEditing,
     loadFlavorById,
     requestedFlavorId,
+    user,
   ])
 
+function goToSignIn() {
+  router.push("/auth")
+}
+
+function showSignInRequiredAlert() {
+  const message =
+    "Mixes cannot be saved unless you are signed in. Sign in before building your mix so you do not lose your work."
+
+  if (Platform.OS === "web") {
+    const shouldSignIn = window.confirm(
+      `Sign In Required\n\n${message}\n\nPress OK to sign in.`
+    )
+
+    if (shouldSignIn) {
+      goToSignIn()
+    }
+
+    return
+  }
+
+  Alert.alert(
+    "Sign In Required",
+    message,
+    [
+      {
+        text: "Cancel",
+        style: "cancel",
+      },
+      {
+        text: "Sign In",
+        onPress: goToSignIn,
+      },
+    ]
+  )
+}
+
+function openFlavorPicker() {
+  console.log("BUILDER USER:", user)
+  if (!user) {
+    showSignInRequiredAlert()
+    return
+  }
+
+  setShowFlavorPicker(true)
+}
+
+function openCatalogSubmission() {
+  if (!user) {
+    showSignInRequiredAlert()
+    return
+  }
+
+  setShowFlavorPicker(false)
+  setShowCatalogSubmission(true)
+}
+
+function closeCatalogSubmission() {
+  setShowCatalogSubmission(false)
+  setSearch("")
+}
+
+
   function addFlavor(flavor: Flavor) {
+  if (!user) {
+    showSignInRequiredAlert()
+    return
+  }
+
+
     setSelectedFlavors((current) => {
       if (
         current.length >= 4 ||
@@ -477,6 +592,10 @@ const smartSuggestions = useMemo(() => {
   }
 
   async function handleSaveMix() {
+      if (!user) {
+    showSignInRequiredAlert()
+    return
+  }
     if (isSaving) {
       return
     }
@@ -512,7 +631,7 @@ const smartSuggestions = useMemo(() => {
         flavorId: item.flavor.id,
         flavorName: item.flavor.name,
         brand: getFlavorBrandName(item.flavor) || null,
-        image: item.flavor.image,
+        image: item.flavor.imageUrl,
         percentage: item.percentage,
       })),
     }
@@ -625,6 +744,49 @@ const smartSuggestions = useMemo(() => {
           </View>
         </View>
 
+        {!isSignedIn ? (
+  <View style={styles.signInWarningCard}>
+    <View style={styles.signInWarningIcon}>
+      <Ionicons
+        name="lock-closed-outline"
+        size={25}
+        color={theme.primary}
+      />
+    </View>
+
+    <View style={styles.signInWarningContent}>
+      <Text style={styles.signInWarningTitle}>
+        Sign in before building your mix
+      </Text>
+
+      <Text style={styles.signInWarningText}>
+        Mixes cannot be saved unless you are
+        signed in. Sign in now so you do not
+        spend time creating a mix that cannot
+        be saved.
+      </Text>
+
+      <TouchableOpacity
+        style={styles.signInWarningButton}
+        activeOpacity={0.85}
+        onPress={goToSignIn}
+      >
+        <Ionicons
+          name="log-in-outline"
+          size={18}
+          color="#FFFFFF"
+        />
+
+        <Text
+          style={styles.signInWarningButtonText}
+        >
+          Sign In or Create Account
+        </Text>
+      </TouchableOpacity>
+    </View>
+  </View>
+) : null}
+
         {isEditing ? (
           <View style={styles.editingBanner}>
             <Ionicons
@@ -722,7 +884,7 @@ const smartSuggestions = useMemo(() => {
         {selectedFlavors.length === 0 ? (
           <TouchableOpacity
             style={styles.emptyFlavorCard}
-            onPress={() => setShowFlavorPicker(true)}
+            onPress={openFlavorPicker}
           >
             <View style={styles.emptyFlavorIcon}>
               <Ionicons name="add" size={29} color={theme.primary} />
@@ -754,7 +916,7 @@ const smartSuggestions = useMemo(() => {
         {selectedFlavors.length > 0 && selectedFlavors.length < 4 ? (
           <TouchableOpacity
             style={styles.addFlavorButton}
-            onPress={() => setShowFlavorPicker(true)}
+            onPress={openFlavorPicker}
           >
             <Ionicons name="add-circle-outline" size={21} color={theme.primary} />
             <Text style={styles.addFlavorButtonText}>Add another flavor</Text>
@@ -972,41 +1134,84 @@ selectedFlavors.length < 4 ? (
           </>
         ) : null}
 
-        <TouchableOpacity
-          style={[
-            styles.saveButton,
-            (!isValidMix || isSaving) && styles.saveButtonDisabled,
-          ]}
-          activeOpacity={isValidMix && !isSaving ? 0.85 : 1}
-          onPress={handleSaveMix}
-          disabled={!isValidMix || isSaving}
-        >
-          <Ionicons
-  name={isSaving ? "hourglass-outline" : isEditing ? "checkmark-circle-outline" : "save-outline"}
-  size={21}
-  color="#FFFFFF"
-/>
+       <TouchableOpacity
+  style={[
+    styles.saveButton,
+    (isSignedIn &&
+      (!isValidMix || isSaving)) &&
+      styles.saveButtonDisabled,
 
-         <Text style={styles.saveButtonText}>
-  {isSaving ? "Saving..." : isEditing ? "Update Mix" : "Save Mix"}
-</Text>
-        </TouchableOpacity>
+    !isSignedIn &&
+      styles.signInSaveButton,
+  ]}
+  activeOpacity={0.85}
+  onPress={
+    isSignedIn
+      ? handleSaveMix
+      : goToSignIn
+  }
+  disabled={
+    isSignedIn &&
+    (!isValidMix || isSaving)
+  }
+>
+  <Ionicons
+    name={
+      !isSignedIn
+        ? "log-in-outline"
+        : isSaving
+          ? "hourglass-outline"
+          : isEditing
+            ? "checkmark-circle-outline"
+            : "save-outline"
+    }
+    size={21}
+    color="#FFFFFF"
+  />
+
+  <Text style={styles.saveButtonText}>
+    {!isSignedIn
+      ? "Sign In to Save Mix"
+      : isSaving
+        ? "Saving..."
+        : isEditing
+          ? "Update Mix"
+          : "Save Mix"}
+  </Text>
+</TouchableOpacity>
       </ScrollView>
 
       <FlavorPickerModal
-        visible={showFlavorPicker}
-        search={search}
-        onSearchChange={setSearch}
-        flavors={filteredFlavors}
-        selectedCount={selectedFlavors.length}
-        onClose={() => {
-          setShowFlavorPicker(false)
-          setSearch("")
-        }}
-        onSelect={addFlavor}
-        theme={theme}
-        styles={styles}
-      />
+  visible={showFlavorPicker}
+  search={search}
+  onSearchChange={setSearch}
+  flavors={filteredFlavors}
+  selectedCount={selectedFlavors.length}
+  onClose={() => {
+    setShowFlavorPicker(false)
+    setSearch("")
+  }}
+  onSelect={addFlavor}
+  onSuggestFlavor={openCatalogSubmission}
+  theme={theme}
+  styles={styles}
+/>
+
+<SuggestCatalogModal
+  visible={showCatalogSubmission}
+  brands={availableBrands}
+  initialFlavorName={search}
+  theme={theme}
+  onClose={closeCatalogSubmission}
+  onSubmitted={() => {
+    closeCatalogSubmission()
+
+    Alert.alert(
+      "Submission Received",
+      "Your brand and flavor were submitted for review. You will receive a notification after an admin reviews them."
+    )
+  }}
+/>
     </SafeAreaView>
   )
 }
@@ -1097,6 +1302,7 @@ type FlavorPickerModalProps = {
   selectedCount: number
   onClose: () => void
   onSelect: (flavor: Flavor) => void
+  onSuggestFlavor: () => void
   theme: AppTheme
   styles: ReturnType<typeof getStyles>
 }
@@ -1109,6 +1315,7 @@ function FlavorPickerModal({
   selectedCount,
   onClose,
   onSelect,
+  onSuggestFlavor,
   theme,
   styles,
 }: FlavorPickerModalProps) {
@@ -1206,20 +1413,96 @@ function FlavorPickerModal({
               </View>
             </TouchableOpacity>
           )}
-          ListEmptyComponent={
-            <View style={styles.modalEmptyContainer}>
-              <Ionicons
-                name="search-outline"
-                size={38}
-                color={theme.primary}
-              />
+         ListEmptyComponent={
+  <View style={styles.modalEmptyContainer}>
+    <View style={styles.modalEmptyIcon}>
+      <Ionicons
+        name="search-outline"
+        size={34}
+        color={theme.primary}
+      />
+    </View>
 
-              <Text style={styles.modalEmptyTitle}>No flavors found</Text>
-              <Text style={styles.modalEmptyText}>
-                Try searching for another flavor or brand.
-              </Text>
-            </View>
+    <Text style={styles.modalEmptyTitle}>
+      No flavors found
+    </Text>
+
+    <Text style={styles.modalEmptyText}>
+      This brand or flavor may not be in the
+      CloudBlend catalog yet.
+    </Text>
+
+    <TouchableOpacity
+      style={styles.suggestFlavorButton}
+      activeOpacity={0.85}
+      onPress={onSuggestFlavor}
+    >
+      <Ionicons
+        name="add-circle-outline"
+        size={20}
+        color="#FFFFFF"
+      />
+
+      <Text
+        style={styles.suggestFlavorButtonText}
+      >
+        Suggest New Brand & Flavor
+      </Text>
+    </TouchableOpacity>
+  </View>
+}
+
+ListFooterComponent={
+  flavors.length > 0 ? (
+    <TouchableOpacity
+      style={
+        styles.catalogSuggestionFooter
+      }
+      activeOpacity={0.85}
+      onPress={onSuggestFlavor}
+    >
+      <View
+        style={
+          styles.catalogSuggestionFooterIcon
+        }
+      >
+        <Ionicons
+          name="add"
+          size={20}
+          color={theme.primary}
+        />
+      </View>
+
+      <View
+        style={
+          styles.catalogSuggestionFooterContent
+        }
+      >
+        <Text
+          style={
+            styles.catalogSuggestionFooterTitle
           }
+        >
+          Can’t find what you need?
+        </Text>
+
+        <Text
+          style={
+            styles.catalogSuggestionFooterText
+          }
+        >
+          Suggest a missing brand and flavor.
+        </Text>
+      </View>
+
+      <Ionicons
+        name="chevron-forward"
+        size={19}
+        color={theme.muted}
+      />
+    </TouchableOpacity>
+  ) : null
+}
         />
       </SafeAreaView>
     </Modal>
@@ -1545,6 +1828,11 @@ function getStyles(theme: AppTheme) {
   borderColor: theme.border,
   borderRadius: 18,
   backgroundColor: theme.card,
+},
+
+selectedFlavorHeader: {
+  flexDirection: "row",
+  alignItems: "center",
 },
 
   selectedFlavorImage: {
@@ -2109,6 +2397,134 @@ suggestionMessageText: {
   flex: 1,
   fontSize: 11,
   lineHeight: 17,
+  color: theme.textSecondary,
+},
+
+signInWarningCard: {
+  marginHorizontal: 18,
+  marginBottom: 16,
+  padding: 17,
+  flexDirection: "row",
+  alignItems: "flex-start",
+  borderWidth: 1,
+  borderColor: theme.primary,
+  borderRadius: 20,
+  backgroundColor: theme.primaryLight,
+},
+
+signInWarningIcon: {
+  width: 48,
+  height: 48,
+  alignItems: "center",
+  justifyContent: "center",
+  borderRadius: 15,
+  backgroundColor: theme.card,
+},
+
+signInWarningContent: {
+  flex: 1,
+  marginLeft: 13,
+},
+
+signInWarningTitle: {
+  fontSize: 16,
+  fontWeight: "800",
+  color: theme.text,
+},
+
+signInWarningText: {
+  marginTop: 5,
+  fontSize: 12,
+  lineHeight: 18,
+  color: theme.textSecondary,
+},
+
+signInWarningButton: {
+  alignSelf: "flex-start",
+  minHeight: 42,
+  marginTop: 13,
+  paddingHorizontal: 14,
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 7,
+  borderRadius: 13,
+  backgroundColor: theme.primary,
+},
+
+signInWarningButtonText: {
+  fontSize: 12,
+  fontWeight: "800",
+  color: "#FFFFFF",
+},
+
+signInSaveButton: {
+  backgroundColor: theme.primary,
+},
+
+modalEmptyIcon: {
+  width: 66,
+  height: 66,
+  alignItems: "center",
+  justifyContent: "center",
+  borderRadius: 22,
+  backgroundColor: theme.primaryLight,
+},
+
+suggestFlavorButton: {
+  minHeight: 48,
+  marginTop: 20,
+  paddingHorizontal: 18,
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 8,
+  borderRadius: 15,
+  backgroundColor: theme.primary,
+},
+
+suggestFlavorButtonText: {
+  fontSize: 13,
+  fontWeight: "800",
+  color: "#FFFFFF",
+},
+
+catalogSuggestionFooter: {
+  minHeight: 76,
+  marginTop: 8,
+  paddingHorizontal: 14,
+  flexDirection: "row",
+  alignItems: "center",
+  borderWidth: 1,
+  borderStyle: "dashed",
+  borderColor: theme.primary,
+  borderRadius: 17,
+  backgroundColor: theme.primaryLight,
+},
+
+catalogSuggestionFooterIcon: {
+  width: 42,
+  height: 42,
+  alignItems: "center",
+  justifyContent: "center",
+  borderRadius: 14,
+  backgroundColor: theme.card,
+},
+
+catalogSuggestionFooterContent: {
+  flex: 1,
+  marginLeft: 12,
+},
+
+catalogSuggestionFooterTitle: {
+  fontSize: 13,
+  fontWeight: "800",
+  color: theme.text,
+},
+
+catalogSuggestionFooterText: {
+  marginTop: 3,
+  fontSize: 11,
   color: theme.textSecondary,
 },
 
