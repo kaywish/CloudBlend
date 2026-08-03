@@ -907,9 +907,41 @@ export default function ProfileScreen() {
         color={palette.muted}
       />
     </TouchableOpacity>
+    
   </>
 )}
 
+<View style={styles.divider} />
+<TouchableOpacity
+  style={styles.accountRow}
+  onPress={() =>
+    router.push("/admin/catalog-submissions")
+  }
+>
+  <View style={styles.accountIcon}>
+    <Ionicons
+      name="albums-outline"
+      size={20}
+      color={palette.primary}
+    />
+  </View>
+
+  <View style={styles.accountText}>
+    <Text style={styles.accountLabel}>
+      Catalog Approvals
+    </Text>
+
+    <Text style={styles.accountValue}>
+      Review new brand and flavor submissions
+    </Text>
+  </View>
+
+  <Ionicons
+    name="chevron-forward"
+    size={19}
+    color={palette.muted}
+  />
+</TouchableOpacity>
 
 
 <View style={styles.divider} />

@@ -20,6 +20,8 @@ import {
   type CatalogSubmissionImage,
   type CatalogSubmissionStrength,
   createCatalogSubmission,
+  findExistingFlavor,
+  findPendingCatalogSubmission
 } from "@/services/catalogSubmissionService"
 
 export type CatalogBrandOption = {
@@ -250,6 +252,54 @@ async function selectFlavorImage() {
 
     return
   }
+
+  try {
+  const existingFlavor = await findExistingFlavor({
+    brandId: selectedBrandId,
+    brandName: selectedBrandId
+      ? null
+      : newBrandName,
+    flavorName,
+  })
+
+  if (existingFlavor) {
+      console.log("Flavor already exists!")
+    Alert.alert(
+      "Flavor Already Exists",
+      `${existingFlavor.brandName} ${existingFlavor.name} is already in the CloudBlend catalog. You can select it from the flavor list instead.`
+    )
+
+    return
+  }
+} catch (error) {
+  Alert.alert(
+    "Could Not Check Flavor",
+    error instanceof Error
+      ? error.message
+      : "CloudBlend could not check whether this flavor already exists."
+  )
+
+  return
+}
+
+const alreadyPending =
+  await findPendingCatalogSubmission({
+    brandId: selectedBrandId,
+    brandName: selectedBrandId
+      ? null
+      : newBrandName,
+    flavorName,
+  })
+
+if (alreadyPending) {
+  console.log("Submission already pending!")
+  Alert.alert(
+    "Already Submitted",
+    "This brand and flavor have already been submitted and are waiting for review."
+  )
+
+  return
+}
 
   setIsSubmitting(true)
 

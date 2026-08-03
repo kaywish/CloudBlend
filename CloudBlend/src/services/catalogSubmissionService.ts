@@ -605,3 +605,151 @@ export async function deletePendingCatalogSubmission(
     throw new Error(deleteError.message)
   }
 }
+
+export async function findExistingFlavor({
+  brandId,
+  brandName,
+  flavorName,
+}: {
+  brandId?: string | null
+  brandName?: string | null
+  flavorName: string
+}): Promise<{
+  id: string
+  name: string
+  brandName: string
+} | null> {
+  const normalizedFlavorName = flavorName.trim()
+
+  if (!normalizedFlavorName) {
+    return null
+  }
+
+  if (brandId) {
+    const { data, error } = await supabase
+      .from("flavors")
+      .select(`
+        id,
+        name,
+        brands (
+          name
+        )
+      `)
+      .eq("brand_id", brandId)
+      .ilike("name", normalizedFlavorName)
+      .eq("is_active", true)
+      .maybeSingle()
+
+    if (error) {
+      throw new Error(error.message)
+    }
+
+    if (!data) {
+      return null
+    }
+
+    const brandRelation = data.brands as
+      | { name: string }
+      | { name: string }[]
+      | null
+
+    const existingBrandName = Array.isArray(
+      brandRelation
+    )
+      ? brandRelation[0]?.name ?? ""
+      : brandRelation?.name ?? ""
+
+    return {
+      id: data.id,
+      name: data.name,
+      brandName: existingBrandName,
+    }
+  }
+
+  const normalizedBrandName = brandName?.trim()
+
+  if (!normalizedBrandName) {
+    return null
+  }
+
+  const { data, error } = await supabase
+    .from("flavors")
+    .select(`
+      id,
+      name,
+      brands!inner (
+        name
+      )
+    `)
+    .ilike("name", normalizedFlavorName)
+    .ilike("brands.name", normalizedBrandName)
+    .eq("is_active", true)
+    .maybeSingle()
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  if (!data) {
+    return null
+  }
+
+  const brandRelation = data.brands as
+    | { name: string }
+    | { name: string }[]
+    | null
+
+  const existingBrandName = Array.isArray(
+    brandRelation
+  )
+    ? brandRelation[0]?.name ?? ""
+    : brandRelation?.name ?? ""
+
+  return {
+    id: data.id,
+    name: data.name,
+    brandName: existingBrandName,
+  }
+}
+
+export async function findPendingCatalogSubmission({
+  brandId,
+  brandName,
+  flavorName,
+}: {
+  brandId?: string | null
+  brandName?: string | null
+  flavorName: string
+}): Promise<boolean> {
+  let query = supabase
+    .from("catalog_submissions")
+    .select("id")
+    .eq("status", "pending")
+    .ilike(
+      "proposed_flavor_name",
+      flavorName.trim()
+    )
+
+  if (brandId) {
+    query = query.eq(
+      "existing_brand_id",
+      brandId
+    )
+  } else {
+    query = query
+      .is("existing_brand_id", null)
+      .ilike(
+        "proposed_brand_name",
+        brandName?.trim() ?? ""
+      )
+  }
+
+  const { data, error } =
+    await query.limit(1)
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  return (data?.length ?? 0) > 0
+}
