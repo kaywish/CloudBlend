@@ -1,6 +1,12 @@
 import { Ionicons } from "@expo/vector-icons"
 import { router, useLocalSearchParams } from "expo-router"
-import { useMemo, useState } from "react"
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react"
+import { usePro } from "@/context/ProContext"
 import {
   ActivityIndicator,
   Alert,
@@ -24,10 +30,12 @@ export default function MixDetailScreen() {
   const { theme } = useAppTheme()
   const styles = useMemo(() => getStyles(theme), [theme])
   const { user } = useAuth()
+  const { hasPro, isLoadingPro } = usePro()
 
-  const { id } = useLocalSearchParams<{
+  const { id , autoSave } = useLocalSearchParams<{
     id: string
     viewOnly?: string
+    autoSave?: string
   }>()
 
   const {
@@ -38,6 +46,7 @@ export default function MixDetailScreen() {
   } = useMixes()
 
   const [isDeleting, setIsDeleting] = useState(false)
+  const autoSaveAttemptedRef = useRef(false)
   const [isUpdatingVisibility, setIsUpdatingVisibility] =
     useState(false)
   const [isSavingCopy, setIsSavingCopy] = useState(false)
@@ -83,8 +92,7 @@ export default function MixDetailScreen() {
     mix.sourceMixId
   )
 
-  // Replace this with your RevenueCat entitlement later.
-  const hasPro = false
+
 
   const totalPercentage = mix.ingredients.reduce(
     (total, ingredient) =>
@@ -119,12 +127,12 @@ export default function MixDetailScreen() {
     try {
       await Share.share({
         title: `Check out ${mix.name}`,
-        message: `Check out the mix "${mix.name}" on CloudBlend.\n\nDownload CloudBlend to discover flavors and create your own mixes:\n\n${appStoreUrl}`,
+        message: `Check out the mix "${mix.name}" on KloudIt.\n\nDownload KloudIt to discover flavors and create your own mixes:\n\n${appStoreUrl}`,
         url: appStoreUrl,
       })
     } catch (error) {
       console.error(
-        "Could not share CloudBlend:",
+        "Could not share KloudIt:",
         error
       )
 
@@ -135,77 +143,122 @@ export default function MixDetailScreen() {
     }
   }
 
-  async function handleSaveCommunityMix() {
-    if (isOwner || isSavingCopy) {
-      return
-    }
-
-    if (!user) {
-      router.push("/login")
-      return
-    }
-
-    if (!hasPro) {
-      router.push("/pro")
-      return
-    }
-
-    try {
-      setIsSavingCopy(true)
-
-      const attribution =
-        mix.creatorUsername &&
-        mix.creatorUsername !== "CloudBlend user"
-          ? `Originally shared by @${mix.creatorUsername}`
-          : "Originally shared on CloudBlend"
-
-      const notes = [mix.notes, attribution]
-        .filter(Boolean)
-        .join("\n\n")
-
-      const savedCopy = await saveMix({
-        name: mix.name,
-        notes,
-        visibility: "private",
-        sourceMixId: mix.id,
-        ingredients: mix.ingredients.map(
-          (ingredient) => ({
-            flavorId: ingredient.flavorId,
-            flavorName: ingredient.flavorName,
-            brand: ingredient.brand,
-            image: ingredient.image,
-            percentage: ingredient.percentage,
-          })
-        ),
-      })
-
-      showMessage(
-        "Mix Saved",
-        "This mix was added to My Mixes and will remain private."
-      )
-
-      router.replace({
-        pathname: "/mix/[id]",
-        params: {
-          id: savedCopy.id,
-        },
-      })
-    } catch (error) {
-      console.error(
-        "Could not save community mix:",
-        error
-      )
-
-      const message =
-        error instanceof Error
-          ? error.message
-          : "Something went wrong while saving this mix."
-
-      showMessage("Could Not Save Mix", message)
-    } finally {
-      setIsSavingCopy(false)
-    }
+async function saveCommunityMixCopy() {
+  if (isOwner || isSavingCopy) {
+    return
   }
+
+  try {
+    setIsSavingCopy(true)
+
+    const attribution =
+      mix.creatorUsername &&
+      mix.creatorUsername !== "KloudIt user"
+        ? `Originally shared by @${mix.creatorUsername}`
+        : "Originally shared on KloudIt"
+
+    const notes = [mix.notes, attribution]
+      .filter(Boolean)
+      .join("\n\n")
+
+    const savedCopy = await saveMix({
+      name: mix.name,
+      notes,
+      visibility: "private",
+      sourceMixId: mix.id,
+      ingredients: mix.ingredients.map(
+        (ingredient) => ({
+          flavorId: ingredient.flavorId,
+          flavorName: ingredient.flavorName,
+          brand: ingredient.brand,
+          image: ingredient.image,
+          percentage: ingredient.percentage,
+        })
+      ),
+    })
+
+    showMessage(
+      "Mix Saved",
+      "This community mix was added to My Mixes and will remain private."
+    )
+
+    router.replace({
+      pathname: "/mix/[id]",
+      params: {
+        id: savedCopy.id,
+      },
+    })
+  } catch (error) {
+    console.error(
+      "Could not save community mix:",
+      error
+    )
+
+    const message =
+      error instanceof Error
+        ? error.message
+        : "Something went wrong while saving this mix."
+
+    showMessage("Could Not Save Mix", message)
+  } finally {
+    setIsSavingCopy(false)
+  }
+}
+
+async function handleSaveCommunityMix() {
+  if (
+    isOwner ||
+    isSavingCopy ||
+    isLoadingPro
+  ) {
+    return
+  }
+
+  if (!user) {
+    router.push("/auth")
+    return
+  }
+
+  if (!hasPro) {
+    router.push({
+      pathname: "/pro",
+      params: {
+        returnMixId: mix.id,
+      },
+    })
+
+    return
+  }
+
+  await saveCommunityMixCopy()
+}
+
+useEffect(() => {
+  if (
+    autoSave !== "true" ||
+    autoSaveAttemptedRef.current ||
+    isLoadingPro ||
+    !hasPro ||
+    !user ||
+    isOwner ||
+    isSavedCommunityMix ||
+    isSavingCopy
+  ) {
+    return
+  }
+
+  autoSaveAttemptedRef.current = true
+
+  void saveCommunityMixCopy()
+}, [
+  autoSave,
+  hasPro,
+  isLoadingPro,
+  isOwner,
+  isSavedCommunityMix,
+  isSavingCopy,
+  user,
+])
 
   async function performDelete() {
     if (!isOwner || isDeleting) {
@@ -285,7 +338,7 @@ export default function MixDetailScreen() {
 
       const successMessage =
         newVisibility === "public"
-          ? "Your mix is now visible to the CloudBlend community."
+          ? "Your mix is now visible to the KloudIt community."
           : "Your mix is now private."
 
       showMessage(
@@ -331,7 +384,7 @@ export default function MixDetailScreen() {
       : "Make Mix Private"
 
     const message = makingPublic
-      ? "This mix will be visible to everyone on CloudBlend."
+      ? "This mix will be visible to everyone on KloudIt."
       : "This mix will only be visible to you."
 
     if (Platform.OS === "web") {
@@ -600,17 +653,17 @@ export default function MixDetailScreen() {
               </View>
 
               <TouchableOpacity
-                style={[
-                  styles.saveCommunityButton,
-                  isSavingCopy &&
-                    styles.disabledButton,
-                ]}
+               style={[
+  styles.saveCommunityButton,
+  (isSavingCopy || isLoadingPro) &&
+    styles.disabledButton,
+]}
                 onPress={() => {
                   void handleSaveCommunityMix()
                 }}
-                disabled={isSavingCopy}
+                disabled={isSavingCopy || isLoadingPro}
               >
-                {isSavingCopy ? (
+                {isSavingCopy || isLoadingPro ? (
                   <ActivityIndicator
                     size="small"
                     color={theme.primary}
@@ -623,27 +676,27 @@ export default function MixDetailScreen() {
                   />
                 )}
 
-                <Text
-                  style={styles.saveCommunityButtonText}
-                >
-                  {isSavingCopy
-                    ? "Saving..."
-                    : "Save Mix"}
-                </Text>
+                <Text style={styles.saveCommunityButtonText}>
+  {isSavingCopy
+    ? "Saving..."
+    : isLoadingPro
+      ? "Checking Pro..."
+      : "Save Mix"}
+</Text>
 
-                {!hasPro ? (
-                  <View style={styles.proBadge}>
-                    <Ionicons
-                      name="sparkles"
-                      size={11}
-                      color="#FFFFFF"
-                    />
+              {!isLoadingPro && !hasPro ? (
+  <View style={styles.proBadge}>
+    <Ionicons
+      name="sparkles"
+      size={11}
+      color="#FFFFFF"
+    />
 
-                    <Text style={styles.proBadgeText}>
-                      PRO
-                    </Text>
-                  </View>
-                ) : null}
+    <Text style={styles.proBadgeText}>
+      PRO
+    </Text>
+  </View>
+) : null}
               </TouchableOpacity>
             </View>
           )}

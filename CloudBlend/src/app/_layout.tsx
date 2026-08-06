@@ -1,11 +1,14 @@
 import { Stack } from "expo-router"
 import { StatusBar } from "expo-status-bar"
-
 import { AuthProvider } from "@/context/AuthContext"
-import { AppThemeProvider, useAppTheme } from "@/context/AppThemeContext"
-import { MixProvider } from "@/context/MixContext"
-import { ProfileProvider } from "@/context/ProfileContext"
+import {
+  AppThemeProvider,
+  useAppTheme,
+} from "@/context/AppThemeContext"
 import { FlavorProvider } from "@/context/FlavorContext"
+import { MixProvider } from "@/context/MixContext"
+import { ProProvider } from "@/context/ProContext"
+import { ProfileProvider } from "@/context/ProfileContext"
 
 function AppNavigator() {
   const { theme, resolvedTheme } = useAppTheme()
@@ -13,7 +16,11 @@ function AppNavigator() {
   return (
     <>
       <StatusBar
-        style={resolvedTheme === "dark" ? "light" : "dark"}
+        style={
+          resolvedTheme === "dark"
+            ? "light"
+            : "dark"
+        }
       />
 
       <Stack
@@ -30,6 +37,13 @@ function AppNavigator() {
         <Stack.Screen name="reset-password" />
         <Stack.Screen name="flavor/[id]" />
         <Stack.Screen name="mix/[id]" />
+
+        <Stack.Screen
+          name="pro"
+          options={{
+            presentation: "modal",
+          }}
+        />
       </Stack>
     </>
   )
@@ -37,16 +51,18 @@ function AppNavigator() {
 
 export default function RootLayout() {
   return (
-  <AppThemeProvider>
-  <AuthProvider>
-    <ProfileProvider>
-      <MixProvider>
-         <FlavorProvider>
-              <AppNavigator />
-            </FlavorProvider>
-      </MixProvider>
-    </ProfileProvider>
-  </AuthProvider>
-</AppThemeProvider>
+    <AppThemeProvider>
+      <AuthProvider>
+        <ProProvider>
+          <ProfileProvider>
+            <MixProvider>
+              <FlavorProvider>
+                <AppNavigator />
+              </FlavorProvider>
+            </MixProvider>
+          </ProfileProvider>
+        </ProProvider>
+      </AuthProvider>
+    </AppThemeProvider>
   )
 }

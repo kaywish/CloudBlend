@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons"
 import * as ImagePicker from "expo-image-picker"
 import { router, useFocusEffect } from "expo-router"
+import { usePro } from "@/context/ProContext"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import {
   ActivityIndicator,
@@ -55,6 +56,13 @@ export default function ProfileScreen() {
     resolvedTheme,
     setThemeMode,
   } = useAppTheme()
+
+  const {
+  hasPro,
+  isLoadingPro,
+  isPurchasing,
+  restorePurchases,
+} = usePro()
 
   const palette = {
     background: theme.background,
@@ -160,6 +168,41 @@ export default function ProfileScreen() {
       setIsRefreshing(false)
     }
   }
+
+  function showProfileMessage(
+  title: string,
+  message: string
+) {
+  if (Platform.OS === "web") {
+    window.alert(`${title}\n\n${message}`)
+    return
+  }
+
+  Alert.alert(title, message)
+}
+
+async function handleRestorePurchases() {
+  if (!user) {
+    router.push("/auth")
+    return
+  }
+
+  const result = await restorePurchases()
+
+  if (!result.success) {
+    showProfileMessage(
+      "No Purchase Restored",
+      result.error ??
+        "No active KloudIt Pro subscription was found."
+    )
+    return
+  }
+
+  showProfileMessage(
+    "Purchase Restored",
+    "KloudIt Pro is now active on your account."
+  )
+}
 
   function openEditor() {
     if (!profile) return
@@ -946,6 +989,7 @@ export default function ProfileScreen() {
 
 <View style={styles.divider} />
 
+
 <TouchableOpacity
   style={styles.accountRow}
   onPress={handleSignOut}
@@ -981,6 +1025,91 @@ export default function ProfileScreen() {
                 color={palette.muted}
               />
             </TouchableOpacity>
+
+            <View style={styles.proCard}>
+  <View style={styles.proCardTop}>
+    <View style={styles.proIcon}>
+      <Ionicons
+        name={hasPro ? "diamond" : "sparkles"}
+        size={23}
+        color="#FFFFFF"
+      />
+    </View>
+
+    <View style={styles.proContent}>
+      <Text style={styles.proEyebrow}>
+        {hasPro ? "CURRENT PLAN" : "UPGRADE"}
+      </Text>
+
+      <Text style={styles.proTitle}>
+        {hasPro
+          ? "KloudIt Pro"
+          : "Unlock KloudIt Pro"}
+      </Text>
+
+      <Text style={styles.proDescription}>
+        {hasPro
+          ? "Your Pro features are active on this account."
+          : "Save community mixes and unlock advanced collection tools."}
+      </Text>
+    </View>
+
+    {hasPro ? (
+      <View style={styles.proActiveBadge}>
+        <Text style={styles.proActiveBadgeText}>
+          Active
+        </Text>
+      </View>
+    ) : null}
+  </View>
+
+  {!hasPro && !isLoadingPro ? (
+    <TouchableOpacity
+      style={styles.upgradeButton}
+      onPress={() => router.push("/pro")}
+    >
+      <Ionicons
+        name="sparkles"
+        size={17}
+        color="#FFFFFF"
+      />
+
+      <Text style={styles.upgradeButtonText}>
+        View KloudIt Pro
+      </Text>
+    </TouchableOpacity>
+  ) : null}
+
+  <TouchableOpacity
+    style={[
+      styles.profileRestoreButton,
+      isPurchasing && styles.disabledButton,
+    ]}
+    disabled={isPurchasing}
+    onPress={() => {
+      void handleRestorePurchases()
+    }}
+  >
+    {isPurchasing ? (
+      <ActivityIndicator
+        size="small"
+        color={palette.primary}
+      />
+    ) : (
+      <Ionicons
+        name="refresh-outline"
+        size={18}
+        color={palette.primary}
+      />
+    )}
+
+    <Text style={styles.profileRestoreButtonText}>
+      {isPurchasing
+        ? "Checking Purchases..."
+        : "Restore Purchases"}
+    </Text>
+  </TouchableOpacity>
+</View>
           </View>
         </View>
       </ScrollView>
@@ -2038,6 +2167,105 @@ function getStyles(palette: ProfilePalette) {
   accountChevron: {
     marginLeft: 10,
   },
+
+  proCard: {
+  marginHorizontal: 18,
+  marginTop: 18,
+  padding: 18,
+  borderRadius: 24,
+  backgroundColor: palette.card,
+  borderWidth: 1,
+  borderColor: palette.border,
+},
+
+proCardTop: {
+  flexDirection: "row",
+  alignItems: "flex-start",
+  gap: 12,
+},
+
+proIcon: {
+  width: 48,
+  height: 48,
+  alignItems: "center",
+  justifyContent: "center",
+  borderRadius: 16,
+  backgroundColor: palette.primary,
+},
+
+proContent: {
+  flex: 1,
+},
+
+proEyebrow: {
+  fontSize: 9,
+  fontWeight: "900",
+  letterSpacing: 1.2,
+  color: palette.primary,
+},
+
+proTitle: {
+  marginTop: 4,
+  fontSize: 18,
+  fontWeight: "900",
+  color: palette.text,
+},
+
+proDescription: {
+  marginTop: 5,
+  fontSize: 12,
+  lineHeight: 18,
+  color: palette.muted,
+},
+
+proActiveBadge: {
+  paddingHorizontal: 9,
+  paddingVertical: 6,
+  borderRadius: 11,
+  backgroundColor: palette.success,
+},
+
+proActiveBadgeText: {
+  fontSize: 9,
+  fontWeight: "900",
+  color: "#FFFFFF",
+},
+
+upgradeButton: {
+  minHeight: 48,
+  marginTop: 17,
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 8,
+  borderRadius: 15,
+  backgroundColor: palette.primary,
+},
+
+upgradeButtonText: {
+  fontSize: 13,
+  fontWeight: "900",
+  color: "#FFFFFF",
+},
+
+profileRestoreButton: {
+  minHeight: 44,
+  marginTop: 8,
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 7,
+},
+
+profileRestoreButtonText: {
+  fontSize: 13,
+  fontWeight: "800",
+  color: palette.primary,
+},
+
+disabledButton: {
+  opacity: 0.6,
+},
   
 })
 }

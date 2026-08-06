@@ -229,7 +229,7 @@ export default function ExploreScreen() {
               </View>
 
               <Text style={styles.heroTitle}>
-                Explore CloudBlend
+                Explore KloudIt
               </Text>
 
               <Text style={styles.heroSubtitle}>
@@ -591,7 +591,7 @@ export default function ExploreScreen() {
             <Text style={styles.emptyText}>
               {searchQuery
                 ? "Try searching for a different mix, creator, flavor, or brand."
-                : "Publish one of your mixes to help start the CloudBlend community."}
+                : "Publish one of your mixes to help start the KloudIt community."}
             </Text>
 
             {searchQuery ? (
@@ -626,7 +626,7 @@ export default function ExploreScreen() {
             .slice(0, 3)
 
           const creatorUsername =
-            item.creatorUsername?.trim() || "CloudBlend user"
+            item.creatorUsername?.trim() || "KloudIt user"
 
           return (
             <TouchableOpacity

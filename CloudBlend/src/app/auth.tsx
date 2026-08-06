@@ -317,7 +317,13 @@ export default function AuthScreen() {
           <View style={styles.topBar}>
             <TouchableOpacity
               style={styles.closeButton}
-              onPress={() => router.back()}
+             onPress={() => {
+  if (router.canGoBack()) {
+    router.back()
+  } else {
+    router.replace("/profile")
+  }
+}}
               accessibilityLabel="Close authentication screen"
             >
               <Ionicons
