@@ -11,11 +11,14 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  KeyboardAvoidingView,
+  Modal,
   Platform,
   ScrollView,
   Share,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native"
@@ -25,6 +28,37 @@ import type { AppTheme } from "@/constants/colors"
 import { useAppTheme } from "@/context/AppThemeContext"
 import { useAuth } from "@/context/AuthContext"
 import { useMixes } from "@/context/MixContext"
+import { supabase } from "@/lib/supabase"
+
+type MixReview = {
+  id: string
+  mixId: string
+  userId: string
+  rating: number
+  review: string
+  username: string
+  displayName: string | null
+  avatarUrl: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+type MixReviewRow = {
+  id: string
+  mix_id: string
+  user_id: string
+  rating: number
+  review: string | null
+  created_at: string
+  updated_at: string
+}
+
+type ReviewProfileRow = {
+  id: string
+  username: string | null
+  display_name: string | null
+  avatar_url: string | null
+}
 
 export default function MixDetailScreen() {
   const { theme } = useAppTheme()
@@ -32,7 +66,7 @@ export default function MixDetailScreen() {
   const { user } = useAuth()
   const { hasPro, isLoadingPro } = usePro()
 
-  const { id , autoSave } = useLocalSearchParams<{
+  const { id, autoSave } = useLocalSearchParams<{
     id: string
     viewOnly?: string
     autoSave?: string
@@ -51,7 +85,141 @@ export default function MixDetailScreen() {
     useState(false)
   const [isSavingCopy, setIsSavingCopy] = useState(false)
 
+  const [reviews, setReviews] = useState<MixReview[]>([])
+  const [isLoadingReviews, setIsLoadingReviews] = useState(false)
+  const [ratingModalVisible, setRatingModalVisible] = useState(false)
+  const [selectedRating, setSelectedRating] = useState(0)
+  const [reviewText, setReviewText] = useState("")
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false)
+
   const mix = getMixById(id)
+
+  const myReview = useMemo(
+    () =>
+      reviews.find(
+        (review) => review.userId === user?.id
+      ) ?? null,
+    [reviews, user?.id]
+  )
+
+  const averageRating = useMemo(() => {
+    if (reviews.length === 0) return 0
+
+    return (
+      reviews.reduce(
+        (total, review) => total + review.rating,
+        0
+      ) / reviews.length
+    )
+  }, [reviews])
+
+  const ratingCount = reviews.length
+
+  async function loadMixReviews() {
+    if (!id) {
+      setReviews([])
+      return
+    }
+
+    try {
+      setIsLoadingReviews(true)
+
+      const { data, error } = await supabase
+        .from("mix_reviews")
+        .select(`
+          id,
+          mix_id,
+          user_id,
+          rating,
+          review,
+          created_at,
+          updated_at
+        `)
+        .eq("mix_id", id)
+        .order("created_at", {
+          ascending: false,
+        })
+
+      if (error) {
+        throw error
+      }
+
+      const rows = (data ?? []) as MixReviewRow[]
+
+      const userIds = [
+        ...new Set(
+          rows.map((row) => row.user_id)
+        ),
+      ]
+
+      const profilesById =
+        new Map<string, ReviewProfileRow>()
+
+      if (userIds.length > 0) {
+        const {
+          data: profiles,
+          error: profileError,
+        } = await supabase
+          .from("profiles")
+          .select(
+            "id, username, display_name, avatar_url"
+          )
+          .in("id", userIds)
+
+        if (profileError) {
+          console.error(
+            "Could not load review profiles:",
+            profileError
+          )
+        } else {
+          for (const profile of
+            (profiles ?? []) as ReviewProfileRow[]) {
+            profilesById.set(
+              profile.id,
+              profile
+            )
+          }
+        }
+      }
+
+      setReviews(
+        rows.map((row) => {
+          const profile =
+            profilesById.get(row.user_id)
+
+          return {
+            id: row.id,
+            mixId: row.mix_id,
+            userId: row.user_id,
+            rating: Number(row.rating),
+            review: row.review ?? "",
+            username:
+              profile?.username?.trim() ||
+              "KloudIt user",
+            displayName:
+              profile?.display_name?.trim() ||
+              null,
+            avatarUrl:
+              profile?.avatar_url ?? null,
+            createdAt: row.created_at,
+            updatedAt: row.updated_at,
+          }
+        })
+      )
+    } catch (error) {
+      console.error(
+        "Could not load mix reviews:",
+        error
+      )
+    } finally {
+      setIsLoadingReviews(false)
+    }
+  }
+
+  useEffect(() => {
+    void loadMixReviews()
+  }, [id])
+
 
   if (!mix) {
     return (
@@ -259,6 +427,194 @@ useEffect(() => {
   isSavingCopy,
   user,
 ])
+
+  function openRatingModal() {
+    if (!mix) return
+
+    if (!user) {
+      if (Platform.OS === "web") {
+        const shouldSignIn = window.confirm(
+          "Sign in to rate and review community mixes."
+        )
+
+        if (shouldSignIn) {
+          router.push("/auth")
+        }
+
+        return
+      }
+
+      Alert.alert(
+        "Sign In Required",
+        "Sign in to rate and review community mixes.",
+        [
+          {
+            text: "Cancel",
+            style: "cancel",
+          },
+          {
+            text: "Sign In",
+            onPress: () => router.push("/auth"),
+          },
+        ]
+      )
+
+      return
+    }
+
+    if (mix.userId === user.id) {
+      showMessage(
+        "Your Mix",
+        "You can't rate your own mix."
+      )
+      return
+    }
+
+    if (mix.visibility !== "public") {
+      showMessage(
+        "Public Mixes Only",
+        "Only public community mixes can be rated."
+      )
+      return
+    }
+
+    setSelectedRating(myReview?.rating ?? 0)
+    setReviewText(myReview?.review ?? "")
+    setRatingModalVisible(true)
+  }
+
+  async function handleSubmitReview() {
+    if (!mix || selectedRating < 1) {
+      showMessage(
+        "Choose a Rating",
+        "Select between 1 and 5 stars."
+      )
+      return
+    }
+
+    if (!user) {
+      router.push("/auth")
+      return
+    }
+
+    try {
+      setIsSubmittingReview(true)
+
+      const cleanReview = reviewText.trim()
+
+      const { error } = await supabase
+        .from("mix_reviews")
+        .upsert(
+          {
+            mix_id: mix.id,
+            user_id: user.id,
+            rating: selectedRating,
+            review: cleanReview || null,
+            updated_at:
+              new Date().toISOString(),
+          },
+          {
+            onConflict: "mix_id,user_id",
+          }
+        )
+
+      if (error) {
+        throw error
+      }
+
+      await loadMixReviews()
+
+      setRatingModalVisible(false)
+
+      showMessage(
+        myReview
+          ? "Review Updated"
+          : "Review Submitted",
+        "Thanks for sharing your feedback with the KloudIt community."
+      )
+    } catch (error) {
+      console.error(
+        "Could not submit mix review:",
+        error
+      )
+
+      showMessage(
+        "Could Not Save Review",
+        error instanceof Error
+          ? error.message
+          : "Something went wrong while saving your review."
+      )
+    } finally {
+      setIsSubmittingReview(false)
+    }
+  }
+
+  async function handleDeleteReview() {
+    if (!user || !myReview) return
+
+    const performDeleteReview = async () => {
+      try {
+        const { error } = await supabase
+          .from("mix_reviews")
+          .delete()
+          .eq("id", myReview.id)
+          .eq("user_id", user.id)
+
+        if (error) {
+          throw error
+        }
+
+        await loadMixReviews()
+        setSelectedRating(0)
+        setReviewText("")
+
+        showMessage(
+          "Review Removed",
+          "Your rating and review were removed."
+        )
+      } catch (error) {
+        console.error(
+          "Could not delete mix review:",
+          error
+        )
+
+        showMessage(
+          "Could Not Remove Review",
+          "Please try again."
+        )
+      }
+    }
+
+    if (Platform.OS === "web") {
+      const confirmed = window.confirm(
+        "Remove your rating and review?"
+      )
+
+      if (confirmed) {
+        await performDeleteReview()
+      }
+
+      return
+    }
+
+    Alert.alert(
+      "Remove Review",
+      "Remove your rating and review?",
+      [
+        {
+          text: "Cancel",
+          style: "cancel",
+        },
+        {
+          text: "Remove",
+          style: "destructive",
+          onPress: () => {
+            void performDeleteReview()
+          },
+        },
+      ]
+    )
+  }
 
   async function performDelete() {
     if (!isOwner || isDeleting) {
@@ -874,6 +1230,381 @@ useEffect(() => {
           )}
         </View>
 
+        {mix.visibility === "public" ? (
+          <>
+            <View style={styles.sectionHeader}>
+              <View>
+                <Text style={styles.sectionEyebrow}>
+                  COMMUNITY FEEDBACK
+                </Text>
+
+                <Text style={styles.sectionTitle}>
+                  Ratings & Reviews
+                </Text>
+              </View>
+
+              {!isOwner ? (
+                <TouchableOpacity
+                  style={styles.rateMixButton}
+                  onPress={openRatingModal}
+                >
+                  <Ionicons
+                    name={
+                      myReview
+                        ? "create-outline"
+                        : "star-outline"
+                    }
+                    size={17}
+                    color="#FFFFFF"
+                  />
+
+                  <Text style={styles.rateMixButtonText}>
+                    {myReview
+                      ? "Edit Rating"
+                      : "Rate Mix"}
+                  </Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+
+            <View style={styles.ratingSummaryCard}>
+              <View style={styles.ratingSummaryScore}>
+                <Text style={styles.ratingSummaryValue}>
+                  {ratingCount > 0
+                    ? averageRating.toFixed(1)
+                    : "—"}
+                </Text>
+
+                <View style={styles.ratingSummaryStars}>
+                  {[1, 2, 3, 4, 5].map(
+                    (star) => (
+                      <Ionicons
+                        key={star}
+                        name={
+                          star <=
+                          Math.round(averageRating)
+                            ? "star"
+                            : "star-outline"
+                        }
+                        size={18}
+                        color={theme.warning}
+                      />
+                    )
+                  )}
+                </View>
+
+                <Text style={styles.ratingSummaryCount}>
+                  {ratingCount}{" "}
+                  {ratingCount === 1
+                    ? "rating"
+                    : "ratings"}
+                </Text>
+              </View>
+
+              <View style={styles.ratingSummaryDivider} />
+
+              <View style={styles.ratingSummaryInfo}>
+                <Text style={styles.ratingSummaryTitle}>
+                  Community score
+                </Text>
+
+                <Text style={styles.ratingSummaryText}>
+                  {ratingCount === 0
+                    ? "Be the first community member to rate this mix."
+                    : "Ratings are submitted by KloudIt community members."}
+                </Text>
+
+                {!isOwner ? (
+                  <TouchableOpacity
+                    style={styles.ratingSummaryAction}
+                    onPress={openRatingModal}
+                  >
+                    <Ionicons
+                      name={
+                        myReview
+                          ? "create-outline"
+                          : "star-outline"
+                      }
+                      size={15}
+                      color={theme.primary}
+                    />
+
+                    <Text
+                      style={
+                        styles.ratingSummaryActionText
+                      }
+                    >
+                      {myReview
+                        ? "Update your review"
+                        : "Share your rating"}
+                    </Text>
+                  </TouchableOpacity>
+                ) : (
+                  <Text style={styles.ownerRatingNote}>
+                    You can read community feedback
+                    on your mix here.
+                  </Text>
+                )}
+              </View>
+            </View>
+
+            {isLoadingReviews ? (
+              <View style={styles.reviewsLoadingCard}>
+                <ActivityIndicator
+                  color={theme.primary}
+                />
+
+                <Text style={styles.reviewsLoadingText}>
+                  Loading community reviews...
+                </Text>
+              </View>
+            ) : reviews.length === 0 ? (
+              <View style={styles.noReviewsCard}>
+                <View style={styles.noReviewsIcon}>
+                  <Ionicons
+                    name="chatbubble-ellipses-outline"
+                    size={28}
+                    color={theme.primary}
+                  />
+                </View>
+
+                <Text style={styles.noReviewsTitle}>
+                  No reviews yet
+                </Text>
+
+                <Text style={styles.noReviewsText}>
+                  This mix hasn't received any
+                  community ratings yet.
+                </Text>
+
+                {!isOwner ? (
+                  <TouchableOpacity
+                    style={styles.writeFirstReviewButton}
+                    onPress={openRatingModal}
+                  >
+                    <Ionicons
+                      name="star-outline"
+                      size={17}
+                      color={theme.primary}
+                    />
+
+                    <Text
+                      style={
+                        styles.writeFirstReviewText
+                      }
+                    >
+                      Write the first review
+                    </Text>
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+            ) : (
+              <View style={styles.reviewsList}>
+                {reviews.map((review) => {
+                  const reviewerName =
+                    review.displayName ||
+                    review.username
+
+                  const reviewDate =
+                    new Date(
+                      review.updatedAt ||
+                        review.createdAt
+                    ).toLocaleDateString(
+                      undefined,
+                      {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                      }
+                    )
+
+                  return (
+                    <View
+                      key={review.id}
+                      style={styles.reviewCard}
+                    >
+                      <View style={styles.reviewHeader}>
+                        <View
+                          style={styles.reviewerInfo}
+                        >
+                          {review.avatarUrl ? (
+                            <Image
+                              source={{
+                                uri: review.avatarUrl,
+                              }}
+                              style={
+                                styles.reviewerAvatar
+                              }
+                            />
+                          ) : (
+                            <View
+                              style={
+                                styles.reviewerAvatarFallback
+                              }
+                            >
+                              <Text
+                                style={
+                                  styles.reviewerInitial
+                                }
+                              >
+                                {reviewerName
+                                  .charAt(0)
+                                  .toUpperCase()}
+                              </Text>
+                            </View>
+                          )}
+
+                          <View
+                            style={
+                              styles.reviewerText
+                            }
+                          >
+                            <Text
+                              style={
+                                styles.reviewerName
+                              }
+                            >
+                              {reviewerName}
+                            </Text>
+
+                            <Text
+                              style={
+                                styles.reviewDate
+                              }
+                            >
+                              @{review.username} •{" "}
+                              {reviewDate}
+                            </Text>
+                          </View>
+                        </View>
+
+                        <View
+                          style={
+                            styles.reviewScoreBadge
+                          }
+                        >
+                          <Ionicons
+                            name="star"
+                            size={13}
+                            color={theme.warning}
+                          />
+
+                          <Text
+                            style={
+                              styles.reviewScoreText
+                            }
+                          >
+                            {review.rating.toFixed(1)}
+                          </Text>
+                        </View>
+                      </View>
+
+                      <View
+                        style={styles.reviewStars}
+                      >
+                        {[1, 2, 3, 4, 5].map(
+                          (star) => (
+                            <Ionicons
+                              key={star}
+                              name={
+                                star <=
+                                review.rating
+                                  ? "star"
+                                  : "star-outline"
+                              }
+                              size={15}
+                              color={
+                                theme.warning
+                              }
+                            />
+                          )
+                        )}
+                      </View>
+
+                      {review.review ? (
+                        <Text
+                          style={styles.reviewBody}
+                        >
+                          {review.review}
+                        </Text>
+                      ) : (
+                        <Text
+                          style={
+                            styles.reviewBodyMuted
+                          }
+                        >
+                          Rating only
+                        </Text>
+                      )}
+
+                      {review.userId ===
+                      user?.id ? (
+                        <View
+                          style={
+                            styles.myReviewActions
+                          }
+                        >
+                          <TouchableOpacity
+                            style={
+                              styles.reviewActionButton
+                            }
+                            onPress={
+                              openRatingModal
+                            }
+                          >
+                            <Ionicons
+                              name="create-outline"
+                              size={15}
+                              color={
+                                theme.primary
+                              }
+                            />
+
+                            <Text
+                              style={
+                                styles.reviewActionText
+                              }
+                            >
+                              Edit
+                            </Text>
+                          </TouchableOpacity>
+
+                          <TouchableOpacity
+                            style={
+                              styles.reviewActionButton
+                            }
+                            onPress={() => {
+                              void handleDeleteReview()
+                            }}
+                          >
+                            <Ionicons
+                              name="trash-outline"
+                              size={15}
+                              color={theme.danger}
+                            />
+
+                            <Text
+                              style={[
+                                styles.reviewActionText,
+                                {
+                                  color:
+                                    theme.danger,
+                                },
+                              ]}
+                            >
+                              Remove
+                            </Text>
+                          </TouchableOpacity>
+                        </View>
+                      ) : null}
+                    </View>
+                  )
+                })}
+              </View>
+            )}
+          </>
+        ) : null}
+
         <View style={styles.actionRow}>
           {isOwner ? (
             <TouchableOpacity
@@ -917,6 +1648,169 @@ useEffect(() => {
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      <Modal
+        visible={ratingModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => {
+          if (!isSubmittingReview) {
+            setRatingModalVisible(false)
+          }
+        }}
+      >
+        <KeyboardAvoidingView
+          style={styles.modalOverlay}
+          behavior={
+            Platform.OS === "ios"
+              ? "padding"
+              : undefined
+          }
+        >
+          <TouchableOpacity
+            style={styles.modalBackdrop}
+            activeOpacity={1}
+            onPress={() => {
+              if (!isSubmittingReview) {
+                setRatingModalVisible(false)
+              }
+            }}
+          />
+
+          <View style={styles.ratingModalCard}>
+            <View style={styles.modalHandle} />
+
+            <View style={styles.modalHeader}>
+              <View style={styles.modalHeaderText}>
+                <Text style={styles.modalTitle}>
+                  {myReview
+                    ? "Update your review"
+                    : "Rate this mix"}
+                </Text>
+
+                <Text style={styles.modalSubtitle}>
+                  {mix.name}
+                </Text>
+              </View>
+
+              <TouchableOpacity
+                style={styles.modalCloseButton}
+                disabled={isSubmittingReview}
+                onPress={() =>
+                  setRatingModalVisible(false)
+                }
+              >
+                <Ionicons
+                  name="close"
+                  size={21}
+                  color={theme.text}
+                />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.starPicker}>
+              {[1, 2, 3, 4, 5].map(
+                (star) => (
+                  <TouchableOpacity
+                    key={star}
+                    style={styles.starButton}
+                    activeOpacity={0.7}
+                    onPress={() =>
+                      setSelectedRating(star)
+                    }
+                  >
+                    <Ionicons
+                      name={
+                        star <= selectedRating
+                          ? "star"
+                          : "star-outline"
+                      }
+                      size={38}
+                      color={theme.warning}
+                    />
+                  </TouchableOpacity>
+                )
+              )}
+            </View>
+
+            <Text
+              style={styles.selectedRatingText}
+            >
+              {selectedRating === 0
+                ? "Tap a star to rate"
+                : `${selectedRating} out of 5`}
+            </Text>
+
+            <Text style={styles.reviewInputLabel}>
+              Review{" "}
+              <Text
+                style={styles.optionalLabel}
+              >
+                (optional)
+              </Text>
+            </Text>
+
+            <TextInput
+              style={styles.reviewInput}
+              value={reviewText}
+              onChangeText={setReviewText}
+              placeholder="What did you think about this mix?"
+              placeholderTextColor={
+                theme.textSecondary
+              }
+              multiline
+              maxLength={500}
+              textAlignVertical="top"
+            />
+
+            <Text
+              style={styles.reviewCharacterCount}
+            >
+              {reviewText.length}/500
+            </Text>
+
+            <TouchableOpacity
+              style={[
+                styles.submitReviewButton,
+                (selectedRating === 0 ||
+                  isSubmittingReview) &&
+                  styles.disabledButton,
+              ]}
+              disabled={
+                selectedRating === 0 ||
+                isSubmittingReview
+              }
+              onPress={() => {
+                void handleSubmitReview()
+              }}
+            >
+              {isSubmittingReview ? (
+                <ActivityIndicator
+                  color="#FFFFFF"
+                />
+              ) : (
+                <>
+                  <Ionicons
+                    name="checkmark-circle-outline"
+                    size={19}
+                    color="#FFFFFF"
+                  />
+
+                  <Text
+                    style={
+                      styles.submitReviewText
+                    }
+                  >
+                    {myReview
+                      ? "Update Review"
+                      : "Submit Review"}
+                  </Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </SafeAreaView>
   )
 }
@@ -1377,6 +2271,431 @@ function getStyles(theme: AppTheme) {
       height: "100%",
       borderRadius: 4,
       backgroundColor: theme.primary,
+    },
+
+    rateMixButton: {
+      paddingHorizontal: 13,
+      paddingVertical: 10,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      borderRadius: 13,
+      backgroundColor: theme.primary,
+    },
+
+    rateMixButtonText: {
+      fontSize: 11,
+      fontWeight: "800",
+      color: "#FFFFFF",
+    },
+
+    ratingSummaryCard: {
+      marginHorizontal: 18,
+      padding: 18,
+      flexDirection: "row",
+      alignItems: "center",
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 22,
+      backgroundColor: theme.card,
+    },
+
+    ratingSummaryScore: {
+      width: 112,
+      alignItems: "center",
+    },
+
+    ratingSummaryValue: {
+      fontSize: 34,
+      lineHeight: 40,
+      fontWeight: "900",
+      color: theme.text,
+    },
+
+    ratingSummaryStars: {
+      marginTop: 4,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 2,
+    },
+
+    ratingSummaryCount: {
+      marginTop: 6,
+      fontSize: 11,
+      fontWeight: "700",
+      color: theme.textSecondary,
+    },
+
+    ratingSummaryDivider: {
+      width: 1,
+      alignSelf: "stretch",
+      marginHorizontal: 16,
+      backgroundColor: theme.border,
+    },
+
+    ratingSummaryInfo: {
+      flex: 1,
+    },
+
+    ratingSummaryTitle: {
+      fontSize: 14,
+      fontWeight: "900",
+      color: theme.text,
+    },
+
+    ratingSummaryText: {
+      marginTop: 5,
+      fontSize: 12,
+      lineHeight: 18,
+      color: theme.textSecondary,
+    },
+
+    ratingSummaryAction: {
+      alignSelf: "flex-start",
+      marginTop: 10,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 5,
+    },
+
+    ratingSummaryActionText: {
+      fontSize: 11,
+      fontWeight: "800",
+      color: theme.primary,
+    },
+
+    ownerRatingNote: {
+      marginTop: 10,
+      fontSize: 11,
+      fontWeight: "700",
+      color: theme.textSecondary,
+    },
+
+    reviewsLoadingCard: {
+      marginHorizontal: 18,
+      marginTop: 12,
+      paddingVertical: 26,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 10,
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 20,
+      backgroundColor: theme.card,
+    },
+
+    reviewsLoadingText: {
+      fontSize: 12,
+      color: theme.textSecondary,
+    },
+
+    noReviewsCard: {
+      marginHorizontal: 18,
+      marginTop: 12,
+      padding: 24,
+      alignItems: "center",
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 22,
+      backgroundColor: theme.card,
+    },
+
+    noReviewsIcon: {
+      width: 60,
+      height: 60,
+      alignItems: "center",
+      justifyContent: "center",
+      borderRadius: 20,
+      backgroundColor: theme.primaryLight,
+    },
+
+    noReviewsTitle: {
+      marginTop: 13,
+      fontSize: 17,
+      fontWeight: "900",
+      color: theme.text,
+    },
+
+    noReviewsText: {
+      marginTop: 6,
+      fontSize: 12,
+      lineHeight: 18,
+      textAlign: "center",
+      color: theme.textSecondary,
+    },
+
+    writeFirstReviewButton: {
+      marginTop: 16,
+      paddingHorizontal: 15,
+      paddingVertical: 10,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      borderWidth: 1,
+      borderColor: theme.primary,
+      borderRadius: 13,
+    },
+
+    writeFirstReviewText: {
+      fontSize: 11,
+      fontWeight: "800",
+      color: theme.primary,
+    },
+
+    reviewsList: {
+      marginHorizontal: 18,
+      marginTop: 12,
+      gap: 12,
+    },
+
+    reviewCard: {
+      padding: 17,
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 20,
+      backgroundColor: theme.card,
+    },
+
+    reviewHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 10,
+    },
+
+    reviewerInfo: {
+      flex: 1,
+      flexDirection: "row",
+      alignItems: "center",
+    },
+
+    reviewerAvatar: {
+      width: 42,
+      height: 42,
+      borderRadius: 14,
+      backgroundColor: theme.surface,
+    },
+
+    reviewerAvatarFallback: {
+      width: 42,
+      height: 42,
+      alignItems: "center",
+      justifyContent: "center",
+      borderRadius: 14,
+      backgroundColor: theme.primaryLight,
+    },
+
+    reviewerInitial: {
+      fontSize: 16,
+      fontWeight: "900",
+      color: theme.primaryDark,
+    },
+
+    reviewerText: {
+      flex: 1,
+      marginLeft: 10,
+    },
+
+    reviewerName: {
+      fontSize: 13,
+      fontWeight: "800",
+      color: theme.text,
+    },
+
+    reviewDate: {
+      marginTop: 3,
+      fontSize: 10,
+      color: theme.textSecondary,
+    },
+
+    reviewScoreBadge: {
+      paddingHorizontal: 9,
+      paddingVertical: 6,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 4,
+      borderRadius: 999,
+      backgroundColor:
+        "rgba(244,183,64,0.12)",
+    },
+
+    reviewScoreText: {
+      fontSize: 11,
+      fontWeight: "900",
+      color: theme.text,
+    },
+
+    reviewStars: {
+      marginTop: 12,
+      flexDirection: "row",
+      gap: 3,
+    },
+
+    reviewBody: {
+      marginTop: 10,
+      fontSize: 13,
+      lineHeight: 20,
+      color: theme.text,
+    },
+
+    reviewBodyMuted: {
+      marginTop: 10,
+      fontSize: 12,
+      fontStyle: "italic",
+      color: theme.textSecondary,
+    },
+
+    myReviewActions: {
+      marginTop: 14,
+      paddingTop: 12,
+      flexDirection: "row",
+      gap: 16,
+      borderTopWidth: 1,
+      borderTopColor: theme.border,
+    },
+
+    reviewActionButton: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 5,
+    },
+
+    reviewActionText: {
+      fontSize: 11,
+      fontWeight: "800",
+      color: theme.primary,
+    },
+
+    modalOverlay: {
+      flex: 1,
+      justifyContent: "flex-end",
+    },
+
+    modalBackdrop: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: "rgba(0,0,0,0.48)",
+    },
+
+    ratingModalCard: {
+      paddingHorizontal: 20,
+      paddingTop: 10,
+      paddingBottom:
+        Platform.OS === "ios" ? 34 : 22,
+      borderTopLeftRadius: 28,
+      borderTopRightRadius: 28,
+      backgroundColor: theme.card,
+    },
+
+    modalHandle: {
+      width: 42,
+      height: 5,
+      alignSelf: "center",
+      marginBottom: 18,
+      borderRadius: 3,
+      backgroundColor: theme.border,
+    },
+
+    modalHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 12,
+    },
+
+    modalHeaderText: {
+      flex: 1,
+    },
+
+    modalTitle: {
+      fontSize: 20,
+      fontWeight: "900",
+      color: theme.text,
+    },
+
+    modalSubtitle: {
+      marginTop: 4,
+      fontSize: 12,
+      color: theme.textSecondary,
+    },
+
+    modalCloseButton: {
+      width: 40,
+      height: 40,
+      alignItems: "center",
+      justifyContent: "center",
+      borderRadius: 13,
+      backgroundColor: theme.background,
+    },
+
+    starPicker: {
+      marginTop: 25,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+    },
+
+    starButton: {
+      paddingHorizontal: 4,
+      paddingVertical: 4,
+    },
+
+    selectedRatingText: {
+      marginTop: 8,
+      fontSize: 12,
+      fontWeight: "700",
+      textAlign: "center",
+      color: theme.textSecondary,
+    },
+
+    reviewInputLabel: {
+      marginTop: 23,
+      marginBottom: 8,
+      fontSize: 12,
+      fontWeight: "800",
+      color: theme.text,
+    },
+
+    optionalLabel: {
+      fontWeight: "500",
+      color: theme.textSecondary,
+    },
+
+    reviewInput: {
+      minHeight: 112,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 16,
+      fontSize: 13,
+      lineHeight: 20,
+      color: theme.text,
+      backgroundColor: theme.background,
+    },
+
+    reviewCharacterCount: {
+      marginTop: 6,
+      fontSize: 10,
+      textAlign: "right",
+      color: theme.textSecondary,
+    },
+
+    submitReviewButton: {
+      height: 52,
+      marginTop: 18,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 7,
+      borderRadius: 16,
+      backgroundColor: theme.primary,
+    },
+
+    submitReviewText: {
+      fontSize: 13,
+      fontWeight: "900",
+      color: "#FFFFFF",
     },
 
     actionRow: {

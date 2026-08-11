@@ -22,6 +22,7 @@ import { useAppTheme } from "@/context/AppThemeContext"
 import { useAuth } from "@/context/AuthContext"
 import { usePro } from "@/context/ProContext"
 
+
 const PRO_FEATURES = [
   {
     icon: "bookmark-outline" as const,

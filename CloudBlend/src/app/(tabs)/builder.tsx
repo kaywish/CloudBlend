@@ -654,24 +654,50 @@ function closeCatalogSubmission() {
         return
       }
 
-      const newMix = await saveMix(mixData)
+      try {
+  const newMix = await saveMix(mixData)
 
-      resetBuilder()
+  resetBuilder()
 
-      router.push({
-        pathname: "/mix/[id]",
-        params: {
-          id: newMix.id,
-        },
-      })
-    } catch (error) {
-      console.error("Could not save mix:", error)
+  router.push({
+    pathname: "/mix/[id]",
+    params: {
+      id: newMix.id,
+    },
+  })
+} catch (error) {
+if (
+  error instanceof Error &&
+  error.message === "PRO_REQUIRED"
+) {
+  Alert.alert(
+    "KloudIt Pro Required",
+    "Free accounts can save up to 5 personal mixes. Upgrade to KloudIt Pro for unlimited saved mixes.",
+    [
+      {
+        text: "Not Now",
+        style: "cancel",
+      },
+      {
+        text: "Upgrade",
+        onPress: () => router.push("/pro"),
+      },
+    ]
+  )
 
-      Alert.alert(
-        "Could Not Save Mix",
-        "Something went wrong while saving your mix."
-      )
-    } finally {
+  return
+}
+
+  throw error
+}
+    }  catch (error) {
+  console.error("Could not save mix:", error)
+
+  Alert.alert(
+    "Could Not Save Mix",
+    "Something went wrong while saving your mix."
+  )
+} finally {
       setIsSaving(false)
     }
   }

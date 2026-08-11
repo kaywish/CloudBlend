@@ -15,12 +15,98 @@ import { SafeAreaView } from "react-native-safe-area-context"
 
 import type { AppTheme } from "@/constants/colors"
 import { useAppTheme } from "@/context/AppThemeContext"
-import { SavedMix, useMixes } from "@/context/MixContext"
+import {
+  type SavedMix,
+  useMixes,
+} from "@/context/MixContext"
+
+type MixListItem =
+  | {
+      type: "section"
+      id: string
+      title: string
+      eyebrow: string
+      count: number
+    }
+  | {
+      type: "mix"
+      id: string
+      mix: SavedMix
+      isCommunity: boolean
+    }
 
 export default function FavoritesScreen() {
   const { theme } = useAppTheme()
-  const styles = useMemo(() => getStyles(theme), [theme])
-  const { savedMixes, isLoading, deleteMix } = useMixes()
+  const styles = useMemo(
+    () => getStyles(theme),
+    [theme]
+  )
+
+  const {
+    savedMixes,
+    isLoading,
+    deleteMix,
+  } = useMixes()
+
+  const personalMixes = useMemo(
+    () =>
+      savedMixes.filter(
+        (mix) => !mix.sourceMixId
+      ),
+    [savedMixes]
+  )
+
+  const communityMixes = useMemo(
+    () =>
+      savedMixes.filter((mix) =>
+        Boolean(mix.sourceMixId)
+      ),
+    [savedMixes]
+  )
+
+  const listData = useMemo<MixListItem[]>(() => {
+    const items: MixListItem[] = []
+
+    if (personalMixes.length > 0) {
+      items.push({
+        type: "section",
+        id: "personal-section",
+        title: "My Mixes",
+        eyebrow: "YOUR CREATIONS",
+        count: personalMixes.length,
+      })
+
+      personalMixes.forEach((mix) => {
+        items.push({
+          type: "mix",
+          id: `personal-${mix.id}`,
+          mix,
+          isCommunity: false,
+        })
+      })
+    }
+
+    if (communityMixes.length > 0) {
+      items.push({
+        type: "section",
+        id: "community-section",
+        title: "Community Collection",
+        eyebrow: "SAVED FROM KLOUDIT",
+        count: communityMixes.length,
+      })
+
+      communityMixes.forEach((mix) => {
+        items.push({
+          type: "mix",
+          id: `community-${mix.id}`,
+          mix,
+          isCommunity: true,
+        })
+      })
+    }
+
+    return items
+  }, [communityMixes, personalMixes])
 
   function openMix(mixId: string) {
     router.push({
@@ -32,26 +118,41 @@ export default function FavoritesScreen() {
   }
 
   function confirmDelete(mix: SavedMix) {
+    const isCommunityMix = Boolean(
+      mix.sourceMixId
+    )
+
     Alert.alert(
-      "Delete Mix",
-      `Are you sure you want to delete "${mix.name}"?`,
+      isCommunityMix
+        ? "Remove Saved Mix"
+        : "Delete Mix",
+      isCommunityMix
+        ? `Remove "${mix.name}" from your community collection?`
+        : `Are you sure you want to delete "${mix.name}"?`,
       [
         {
           text: "Cancel",
           style: "cancel",
         },
         {
-          text: "Delete",
+          text: isCommunityMix
+            ? "Remove"
+            : "Delete",
           style: "destructive",
           onPress: async () => {
             try {
               await deleteMix(mix.id)
             } catch (error) {
-              console.error("Could not delete mix:", error)
+              console.error(
+                "Could not delete mix:",
+                error
+              )
 
               Alert.alert(
-                "Could Not Delete",
-                "Something went wrong while deleting this mix."
+                isCommunityMix
+                  ? "Could Not Remove Mix"
+                  : "Could Not Delete Mix",
+                "Something went wrong. Please try again."
               )
             }
           },
@@ -62,7 +163,10 @@ export default function FavoritesScreen() {
 
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.safeArea} edges={["top"]}>
+      <SafeAreaView
+        style={styles.safeArea}
+        edges={["top"]}
+      >
         <View style={styles.loadingContainer}>
           <View style={styles.loadingIcon}>
             <Ionicons
@@ -83,7 +187,8 @@ export default function FavoritesScreen() {
           </Text>
 
           <Text style={styles.loadingText}>
-            Getting your saved CloudBlend recipes ready...
+            Getting your saved KloudIt recipes
+            ready...
           </Text>
         </View>
       </SafeAreaView>
@@ -91,99 +196,132 @@ export default function FavoritesScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={["top"]}>
+    <SafeAreaView
+      style={styles.safeArea}
+      edges={["top"]}
+    >
       <FlatList
-        data={savedMixes}
+        data={listData}
         keyExtractor={(item) => item.id}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[
           styles.listContent,
-          savedMixes.length === 0 && styles.emptyListContent,
+          savedMixes.length === 0 &&
+            styles.emptyListContent,
         ]}
         ListHeaderComponent={
-          <>
-            <View style={styles.hero}>
-              <View style={styles.heroGlowOne} />
-              <View style={styles.heroGlowTwo} />
+          <View style={styles.hero}>
+            <View style={styles.heroGlowOne} />
+            <View style={styles.heroGlowTwo} />
 
-              <View style={styles.heroTopRow}>
-                <View style={styles.heroIcon}>
-                  <Ionicons
-                    name="bookmark"
-                    size={23}
-                    color="#FFFFFF"
-                  />
-                </View>
-
-                <View style={styles.heroCountBadge}>
-                  <Ionicons
-                    name="flask-outline"
-                    size={14}
-                    color="#FFFFFF"
-                  />
-
-                  <Text style={styles.heroCountText}>
-                    {savedMixes.length}{" "}
-                    {savedMixes.length === 1 ? "mix" : "mixes"}
-                  </Text>
-                </View>
+            <View style={styles.heroTopRow}>
+              <View style={styles.heroIcon}>
+                <Ionicons
+                  name="bookmark"
+                  size={23}
+                  color="#FFFFFF"
+                />
               </View>
 
-              <Text style={styles.heroTitle}>
-                Your saved flavor collection
-              </Text>
-
-              <Text style={styles.heroSubtitle}>
-                Revisit your favorite recipes, fine-tune percentages,
-                and keep building better blends.
-              </Text>
-
-              <TouchableOpacity
-                style={styles.heroCreateButton}
-                onPress={() => router.push("/(tabs)/builder")}
-              >
+              <View style={styles.heroCountBadge}>
                 <Ionicons
-                  name="add-circle-outline"
-                  size={19}
-                  color={theme.primary}
+                  name="flask-outline"
+                  size={14}
+                  color="#FFFFFF"
                 />
 
-                <Text style={styles.heroCreateButtonText}>
-                  Create a new mix
+                <Text style={styles.heroCountText}>
+                  {savedMixes.length}{" "}
+                  {savedMixes.length === 1
+                    ? "mix"
+                    : "mixes"}
                 </Text>
-              </TouchableOpacity>
+              </View>
             </View>
 
-            {savedMixes.length > 0 ? (
-              <View style={styles.sectionHeader}>
-                <View>
-                  <Text style={styles.sectionEyebrow}>
-                    YOUR COLLECTION
-                  </Text>
+            <Text style={styles.heroTitle}>
+              Your flavor library
+            </Text>
 
-                  <Text style={styles.sectionTitle}>
-                    Saved Mixes
-                  </Text>
-                </View>
+            <Text style={styles.heroSubtitle}>
+              Keep your personal creations and
+              favorite community recipes together in
+              one place.
+            </Text>
 
-                <View style={styles.countBadge}>
-                  <Text style={styles.countBadgeText}>
-                    {savedMixes.length}
-                  </Text>
-                </View>
+            <View style={styles.heroStats}>
+              <View style={styles.heroStat}>
+                <Text style={styles.heroStatValue}>
+                  {personalMixes.length}
+                </Text>
+
+                <Text style={styles.heroStatLabel}>
+                  My Mixes
+                </Text>
               </View>
-            ) : null}
-          </>
+
+              <View style={styles.heroStatDivider} />
+
+              <View style={styles.heroStat}>
+                <Text style={styles.heroStatValue}>
+                  {communityMixes.length}
+                </Text>
+
+                <Text style={styles.heroStatLabel}>
+                  Community
+                </Text>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={styles.heroCreateButton}
+              onPress={() =>
+                router.push("/(tabs)/builder")
+              }
+            >
+              <Ionicons
+                name="add-circle-outline"
+                size={19}
+                color={theme.primary}
+              />
+
+              <Text
+                style={
+                  styles.heroCreateButtonText
+                }
+              >
+                Create a new mix
+              </Text>
+            </TouchableOpacity>
+          </View>
         }
-        renderItem={({ item }) => (
-          <SavedMixCard
-            mix={item}
-            onPress={() => openMix(item.id)}
-            onDelete={() => confirmDelete(item)}
-            theme={theme}
-            styles={styles}
-          />
-        )}
+        renderItem={({ item }) => {
+          if (item.type === "section") {
+            return (
+              <SectionHeader
+                eyebrow={item.eyebrow}
+                title={item.title}
+                count={item.count}
+                styles={styles}
+              />
+            )
+          }
+
+          return (
+            <SavedMixCard
+              mix={item.mix}
+              isCommunity={item.isCommunity}
+              onPress={() =>
+                openMix(item.mix.id)
+              }
+              onDelete={() =>
+                confirmDelete(item.mix)
+              }
+              theme={theme}
+              styles={styles}
+            />
+          )
+        }}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <View style={styles.emptyIcon}>
@@ -195,21 +333,29 @@ export default function FavoritesScreen() {
             </View>
 
             <Text style={styles.emptyTitle}>
-              No saved mixes yet
+              Your mix library is empty
             </Text>
 
             <Text style={styles.emptyText}>
-              Create your first blend and it will appear here for
-              quick access later.
+              Create your first blend or save a
+              community recipe with KloudIt Pro.
             </Text>
 
             <TouchableOpacity
               style={styles.createButton}
-              onPress={() => router.push("/(tabs)/builder")}
+              onPress={() =>
+                router.push("/(tabs)/builder")
+              }
             >
-              <Ionicons name="add" size={20} color="#FFFFFF" />
+              <Ionicons
+                name="add"
+                size={20}
+                color="#FFFFFF"
+              />
 
-              <Text style={styles.createButtonText}>
+              <Text
+                style={styles.createButtonText}
+              >
                 Build your first mix
               </Text>
             </TouchableOpacity>
@@ -220,8 +366,43 @@ export default function FavoritesScreen() {
   )
 }
 
+type SectionHeaderProps = {
+  eyebrow: string
+  title: string
+  count: number
+  styles: ReturnType<typeof getStyles>
+}
+
+function SectionHeader({
+  eyebrow,
+  title,
+  count,
+  styles,
+}: SectionHeaderProps) {
+  return (
+    <View style={styles.sectionHeader}>
+      <View>
+        <Text style={styles.sectionEyebrow}>
+          {eyebrow}
+        </Text>
+
+        <Text style={styles.sectionTitle}>
+          {title}
+        </Text>
+      </View>
+
+      <View style={styles.countBadge}>
+        <Text style={styles.countBadgeText}>
+          {count}
+        </Text>
+      </View>
+    </View>
+  )
+}
+
 type SavedMixCardProps = {
   mix: SavedMix
+  isCommunity: boolean
   onPress: () => void
   onDelete: () => void
   theme: AppTheme
@@ -230,42 +411,97 @@ type SavedMixCardProps = {
 
 function SavedMixCard({
   mix,
+  isCommunity,
   onPress,
   onDelete,
   theme,
   styles,
 }: SavedMixCardProps) {
-  const createdDate = new Date(mix.createdAt).toLocaleDateString(
-    undefined,
-    {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    }
-  )
+  const createdDate = new Date(
+    mix.createdAt
+  ).toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  })
 
-  const totalPercentage = mix.ingredients.reduce(
-    (total, ingredient) => total + ingredient.percentage,
-    0
-  )
+  const totalPercentage =
+    mix.ingredients.reduce(
+      (total, ingredient) =>
+        total + ingredient.percentage,
+      0
+    )
 
   return (
     <TouchableOpacity
-      style={styles.mixCard}
+      style={[
+        styles.mixCard,
+        isCommunity &&
+          styles.communityMixCard,
+      ]}
       activeOpacity={0.87}
       onPress={onPress}
     >
-      <View style={styles.cardAccent} />
+      <View
+        style={[
+          styles.cardAccent,
+          isCommunity &&
+            styles.communityCardAccent,
+        ]}
+      />
 
       <View style={styles.mixCardHeader}>
-        <View style={styles.mixIcon}>
-          <Ionicons name="flask" size={22} color="#FFFFFF" />
+        <View
+          style={[
+            styles.mixIcon,
+            isCommunity &&
+              styles.communityMixIcon,
+          ]}
+        >
+          <Ionicons
+            name={
+              isCommunity
+                ? "people"
+                : "flask"
+            }
+            size={22}
+            color="#FFFFFF"
+          />
         </View>
 
-        <View style={styles.mixTitleContainer}>
-          <Text style={styles.mixName} numberOfLines={1}>
-            {mix.name}
-          </Text>
+        <View
+          style={styles.mixTitleContainer}
+        >
+          <View style={styles.titleRow}>
+            <Text
+              style={styles.mixName}
+              numberOfLines={1}
+            >
+              {mix.name}
+            </Text>
+
+            {isCommunity ? (
+              <View
+                style={
+                  styles.communityBadge
+                }
+              >
+                <Ionicons
+                  name="people-outline"
+                  size={11}
+                  color={theme.primary}
+                />
+
+                <Text
+                  style={
+                    styles.communityBadgeText
+                  }
+                >
+                  Community
+                </Text>
+              </View>
+            ) : null}
+          </View>
 
           <View style={styles.mixMetaRow}>
             <Ionicons
@@ -297,20 +533,44 @@ function SavedMixCard({
           }}
         >
           <Ionicons
-            name="trash-outline"
+            name={
+              isCommunity
+                ? "bookmark-outline"
+                : "trash-outline"
+            }
             size={18}
             color={theme.danger}
           />
         </TouchableOpacity>
       </View>
 
+      {isCommunity &&
+      mix.creatorUsername ? (
+        <View style={styles.creatorRow}>
+          <Ionicons
+            name="person-circle-outline"
+            size={15}
+            color={theme.primary}
+          />
+
+          <Text style={styles.creatorText}>
+            Originally shared by @
+            {mix.creatorUsername}
+          </Text>
+        </View>
+      ) : null}
+
       <View style={styles.blendSummary}>
         <View>
-          <Text style={styles.blendSummaryLabel}>
+          <Text
+            style={styles.blendSummaryLabel}
+          >
             BLEND TOTAL
           </Text>
 
-          <Text style={styles.blendSummaryValue}>
+          <Text
+            style={styles.blendSummaryValue}
+          >
             {totalPercentage}%
           </Text>
         </View>
@@ -337,7 +597,9 @@ function SavedMixCard({
                 styles.readyBadgeTextWarning,
             ]}
           >
-            {totalPercentage === 100 ? "Balanced" : "Review mix"}
+            {totalPercentage === 100
+              ? "Balanced"
+              : "Review mix"}
           </Text>
         </View>
       </View>
@@ -347,7 +609,10 @@ function SavedMixCard({
           style={[
             styles.progressFill,
             {
-              width: `${Math.min(totalPercentage, 100)}%`,
+              width: `${Math.min(
+                totalPercentage,
+                100
+              )}%`,
             },
             totalPercentage !== 100 &&
               styles.progressFillWarning,
@@ -356,53 +621,81 @@ function SavedMixCard({
       </View>
 
       <View style={styles.ingredientList}>
-        {mix.ingredients.map((ingredient) => (
-          <View
-            key={ingredient.flavorId}
-            style={styles.ingredientRow}
-          >
-            <View style={styles.ingredientInfo}>
-              {ingredient.image ? (
-                <Image
-                  source={{ uri: ingredient.image }}
-                  style={styles.ingredientImage}
-                />
-              ) : (
-                <View style={styles.ingredientImagePlaceholder}>
-                  <Ionicons
-                    name="leaf-outline"
-                    size={17}
-                    color={theme.primary}
+        {mix.ingredients.map(
+          (ingredient, index) => (
+            <View
+              key={`${ingredient.flavorId}-${index}`}
+              style={styles.ingredientRow}
+            >
+              <View
+                style={styles.ingredientInfo}
+              >
+                {ingredient.image ? (
+                  <Image
+                    source={{
+                      uri: ingredient.image,
+                    }}
+                    style={
+                      styles.ingredientImage
+                    }
                   />
-                </View>
-              )}
+                ) : (
+                  <View
+                    style={
+                      styles.ingredientImagePlaceholder
+                    }
+                  >
+                    <Ionicons
+                      name="leaf-outline"
+                      size={17}
+                      color={theme.primary}
+                    />
+                  </View>
+                )}
 
-              <View style={styles.ingredientTextContainer}>
-                <Text
-                  style={styles.ingredientName}
-                  numberOfLines={1}
+                <View
+                  style={
+                    styles.ingredientTextContainer
+                  }
                 >
-                  {ingredient.flavorName}
-                </Text>
-
-                {ingredient.brand ? (
                   <Text
-                    style={styles.ingredientBrand}
+                    style={
+                      styles.ingredientName
+                    }
                     numberOfLines={1}
                   >
-                    {ingredient.brand}
+                    {ingredient.flavorName}
                   </Text>
-                ) : null}
+
+                  {ingredient.brand ? (
+                    <Text
+                      style={
+                        styles.ingredientBrand
+                      }
+                      numberOfLines={1}
+                    >
+                      {ingredient.brand}
+                    </Text>
+                  ) : null}
+                </View>
+              </View>
+
+              <View
+                style={
+                  styles.percentageBadge
+                }
+              >
+                <Text
+                  style={
+                    styles.percentageText
+                  }
+                >
+                  {ingredient.percentage}%
+                </Text>
               </View>
             </View>
-
-            <View style={styles.percentageBadge}>
-              <Text style={styles.percentageText}>
-                {ingredient.percentage}%
-              </Text>
-            </View>
-          </View>
-        ))}
+          )
+        )}
       </View>
 
       {mix.notes ? (
@@ -413,7 +706,10 @@ function SavedMixCard({
             color={theme.textSecondary}
           />
 
-          <Text style={styles.notes} numberOfLines={2}>
+          <Text
+            style={styles.notes}
+            numberOfLines={2}
+          >
             {mix.notes}
           </Text>
         </View>
@@ -454,7 +750,7 @@ function getStyles(theme: AppTheme) {
 
     hero: {
       marginTop: 14,
-      marginBottom: 22,
+      marginBottom: 28,
       padding: 22,
       overflow: "hidden",
       borderRadius: 28,
@@ -468,7 +764,8 @@ function getStyles(theme: AppTheme) {
       width: 150,
       height: 150,
       borderRadius: 75,
-      backgroundColor: "rgba(255,255,255,0.12)",
+      backgroundColor:
+        "rgba(255,255,255,0.12)",
     },
 
     heroGlowTwo: {
@@ -478,7 +775,8 @@ function getStyles(theme: AppTheme) {
       width: 145,
       height: 145,
       borderRadius: 73,
-      backgroundColor: "rgba(255,255,255,0.07)",
+      backgroundColor:
+        "rgba(255,255,255,0.07)",
     },
 
     heroTopRow: {
@@ -493,7 +791,8 @@ function getStyles(theme: AppTheme) {
       alignItems: "center",
       justifyContent: "center",
       borderRadius: 15,
-      backgroundColor: "rgba(255,255,255,0.17)",
+      backgroundColor:
+        "rgba(255,255,255,0.17)",
     },
 
     heroCountBadge: {
@@ -503,7 +802,8 @@ function getStyles(theme: AppTheme) {
       alignItems: "center",
       gap: 6,
       borderRadius: 20,
-      backgroundColor: "rgba(255,255,255,0.15)",
+      backgroundColor:
+        "rgba(255,255,255,0.15)",
     },
 
     heroCountText: {
@@ -524,15 +824,51 @@ function getStyles(theme: AppTheme) {
 
     heroSubtitle: {
       marginTop: 8,
-      maxWidth: 320,
+      maxWidth: 325,
       fontSize: 14,
       lineHeight: 21,
       color: "rgba(255,255,255,0.82)",
     },
 
+    heroStats: {
+      marginTop: 20,
+      paddingVertical: 15,
+      flexDirection: "row",
+      alignItems: "center",
+      borderTopWidth: 1,
+      borderBottomWidth: 1,
+      borderColor:
+        "rgba(255,255,255,0.15)",
+    },
+
+    heroStat: {
+      flex: 1,
+      alignItems: "center",
+    },
+
+    heroStatDivider: {
+      width: 1,
+      height: 34,
+      backgroundColor:
+        "rgba(255,255,255,0.18)",
+    },
+
+    heroStatValue: {
+      fontSize: 21,
+      fontWeight: "900",
+      color: "#FFFFFF",
+    },
+
+    heroStatLabel: {
+      marginTop: 3,
+      fontSize: 10,
+      fontWeight: "700",
+      color: "rgba(255,255,255,0.74)",
+    },
+
     heroCreateButton: {
       alignSelf: "flex-start",
-      marginTop: 20,
+      marginTop: 18,
       paddingHorizontal: 14,
       paddingVertical: 10,
       flexDirection: "row",
@@ -549,6 +885,7 @@ function getStyles(theme: AppTheme) {
     },
 
     sectionHeader: {
+      marginTop: 4,
       marginBottom: 14,
       paddingHorizontal: 2,
       flexDirection: "row",
@@ -682,6 +1019,10 @@ function getStyles(theme: AppTheme) {
       backgroundColor: theme.card,
     },
 
+    communityMixCard: {
+      borderColor: `${theme.primary}35`,
+    },
+
     cardAccent: {
       position: "absolute",
       top: 0,
@@ -689,6 +1030,11 @@ function getStyles(theme: AppTheme) {
       left: 0,
       width: 4,
       backgroundColor: theme.primary,
+    },
+
+    communityCardAccent: {
+      width: 5,
+      backgroundColor: theme.primaryDark,
     },
 
     mixCardHeader: {
@@ -705,16 +1051,61 @@ function getStyles(theme: AppTheme) {
       backgroundColor: theme.primary,
     },
 
+    communityMixIcon: {
+      backgroundColor: theme.primaryDark,
+    },
+
     mixTitleContainer: {
       flex: 1,
       marginLeft: 12,
       marginRight: 8,
     },
 
+    titleRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 7,
+    },
+
     mixName: {
+      flexShrink: 1,
       fontSize: 17,
       fontWeight: "900",
       color: theme.text,
+    },
+
+    communityBadge: {
+      paddingHorizontal: 7,
+      paddingVertical: 4,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 3,
+      borderRadius: 9,
+      backgroundColor: theme.primaryLight,
+    },
+
+    communityBadgeText: {
+      fontSize: 8,
+      fontWeight: "900",
+      color: theme.primary,
+    },
+
+    creatorRow: {
+      marginTop: 13,
+      paddingHorizontal: 11,
+      paddingVertical: 8,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      borderRadius: 11,
+      backgroundColor: theme.primaryLight,
+    },
+
+    creatorText: {
+      flex: 1,
+      fontSize: 11,
+      fontWeight: "700",
+      color: theme.primaryDark,
     },
 
     mixMetaRow: {

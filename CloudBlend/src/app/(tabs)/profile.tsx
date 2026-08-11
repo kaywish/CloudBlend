@@ -50,6 +50,7 @@ function formatJoinedDate(date?: string) {
 
 export default function ProfileScreen() {
   const { user, signOut } = useAuth()
+  
   const {
     theme,
     themeMode,
@@ -63,6 +64,8 @@ export default function ProfileScreen() {
   isPurchasing,
   restorePurchases,
 } = usePro()
+
+
 
   const palette = {
     background: theme.background,
@@ -95,6 +98,21 @@ export default function ProfileScreen() {
     uploadAvatar,
     removeAvatar,
   } = useProfile()
+
+  const FREE_MIX_LIMIT = 5
+
+const personalMixCount = useMemo(
+  () =>
+    savedMixes.filter(
+      (mix) => !mix.sourceMixId
+    ).length,
+  [savedMixes]
+)
+
+const freeMixProgress = Math.min(
+  personalMixCount / FREE_MIX_LIMIT,
+  1
+)
 
   const [isRefreshing, setIsRefreshing] =
     useState(false)
@@ -682,6 +700,84 @@ async function handleRestorePurchases() {
           </View>
         </View>
 
+        <View style={styles.planCard}>
+  <View style={styles.planHeader}>
+    <View style={styles.planIcon}>
+      <Ionicons
+        name={hasPro ? "diamond" : "flask-outline"}
+        size={21}
+        color="#FFFFFF"
+      />
+    </View>
+
+    <View style={styles.planHeaderContent}>
+      <Text style={styles.planEyebrow}>
+        {hasPro ? "KLOUDIT PRO" : "FREE PLAN"}
+      </Text>
+
+      <Text style={styles.planTitle}>
+        {hasPro
+          ? "Unlimited mixes"
+          : `${personalMixCount} of ${FREE_MIX_LIMIT} mixes used`}
+      </Text>
+    </View>
+
+    {hasPro ? (
+      <View style={styles.planActiveBadge}>
+        <Text style={styles.planActiveBadgeText}>
+          PRO
+        </Text>
+      </View>
+    ) : null}
+  </View>
+
+  {!hasPro ? (
+    <>
+      <View style={styles.planProgressTrack}>
+        <View
+          style={[
+            styles.planProgressFill,
+            {
+              width: `${freeMixProgress * 100}%`,
+            },
+          ]}
+        />
+      </View>
+
+      <View style={styles.planBottomRow}>
+        <Text style={styles.planDescription}>
+          {personalMixCount >= FREE_MIX_LIMIT
+            ? "You've reached your free mix limit."
+            : `${FREE_MIX_LIMIT - personalMixCount} ${
+                FREE_MIX_LIMIT - personalMixCount === 1
+                  ? "mix"
+                  : "mixes"
+              } remaining`}
+        </Text>
+
+        <TouchableOpacity
+          style={styles.planUpgradeButton}
+          onPress={() => router.push("/pro")}
+        >
+          <Ionicons
+            name="sparkles"
+            size={14}
+            color="#FFFFFF"
+          />
+
+          <Text style={styles.planUpgradeButtonText}>
+            Upgrade
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </>
+  ) : (
+    <Text style={styles.planDescription}>
+      Create and save as many personal mixes as you want.
+    </Text>
+  )}
+</View>
+
         <View style={styles.sectionHeader}>
           <View>
             <Text style={styles.sectionTitle}>
@@ -693,7 +789,7 @@ async function handleRestorePurchases() {
           </View>
 
           <TouchableOpacity
-            onPress={() => router.push("/mixes")}
+            onPress={() => router.push("/favorites")}
           >
             <Text style={styles.seeAllText}>
               See all
@@ -2265,6 +2361,108 @@ profileRestoreButtonText: {
 
 disabledButton: {
   opacity: 0.6,
+},
+
+planCard: {
+  marginHorizontal: 18,
+  marginTop: 18,
+  padding: 18,
+  borderRadius: 22,
+  borderWidth: 1,
+  borderColor: palette.border,
+  backgroundColor: palette.card,
+},
+
+planHeader: {
+  flexDirection: "row",
+  alignItems: "center",
+  gap: 12,
+},
+
+planIcon: {
+  width: 44,
+  height: 44,
+  alignItems: "center",
+  justifyContent: "center",
+  borderRadius: 14,
+  backgroundColor: palette.primary,
+},
+
+planHeaderContent: {
+  flex: 1,
+},
+
+planEyebrow: {
+  fontSize: 9,
+  fontWeight: "900",
+  letterSpacing: 1.2,
+  color: palette.primary,
+},
+
+planTitle: {
+  marginTop: 3,
+  fontSize: 17,
+  fontWeight: "900",
+  color: palette.text,
+},
+
+planActiveBadge: {
+  paddingHorizontal: 9,
+  paddingVertical: 5,
+  borderRadius: 10,
+  backgroundColor: palette.success,
+},
+
+planActiveBadgeText: {
+  fontSize: 9,
+  fontWeight: "900",
+  color: "#FFFFFF",
+},
+
+planProgressTrack: {
+  height: 8,
+  marginTop: 17,
+  overflow: "hidden",
+  borderRadius: 4,
+  backgroundColor: palette.border,
+},
+
+planProgressFill: {
+  height: "100%",
+  borderRadius: 4,
+  backgroundColor: palette.primary,
+},
+
+planBottomRow: {
+  marginTop: 12,
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: 12,
+},
+
+planDescription: {
+  flex: 1,
+  marginTop: 10,
+  fontSize: 12,
+  lineHeight: 18,
+  color: palette.muted,
+},
+
+planUpgradeButton: {
+  paddingHorizontal: 13,
+  paddingVertical: 9,
+  flexDirection: "row",
+  alignItems: "center",
+  gap: 5,
+  borderRadius: 12,
+  backgroundColor: palette.primary,
+},
+
+planUpgradeButtonText: {
+  fontSize: 11,
+  fontWeight: "900",
+  color: "#FFFFFF",
 },
   
 })

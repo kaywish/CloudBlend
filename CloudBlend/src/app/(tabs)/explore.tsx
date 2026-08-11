@@ -840,16 +840,38 @@ export default function ExploreScreen() {
                   </Text>
                 </TouchableOpacity>
 
-                <View style={styles.openMixHint}>
-                  <Text style={styles.openMixHintText}>
-                    View mix
-                  </Text>
+                <View style={styles.communityFooter}>
+                  <View style={styles.ratingRow}>
+                    <Ionicons
+                      name="star"
+                      size={16}
+                      color="#F4B740"
+                    />
 
-                  <Ionicons
-                    name="arrow-forward"
-                    size={15}
-                    color={theme.primary}
-                  />
+                    <Text style={styles.ratingText}>
+                      {item.ratingCount > 0
+                        ? item.averageRating.toFixed(1)
+                        : "New"}
+                    </Text>
+
+                    {item.ratingCount > 0 ? (
+                      <Text style={styles.ratingCount}>
+                        ({item.ratingCount})
+                      </Text>
+                    ) : null}
+                  </View>
+
+                  <View style={styles.openMixHint}>
+                    <Text style={styles.openMixHintText}>
+                      View Mix
+                    </Text>
+
+                    <Ionicons
+                      name="arrow-forward"
+                      size={15}
+                      color={theme.primary}
+                    />
+                  </View>
                 </View>
               </View>
             </TouchableOpacity>
@@ -1478,17 +1500,7 @@ function getStyles(theme: AppTheme) {
       color: theme.primaryDark,
     },
 
-    openMixHint: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 5,
-    },
-
-    openMixHintText: {
-      fontSize: 11,
-      fontWeight: "800",
-      color: theme.primary,
-    },
+  
 
     emptyState: {
       paddingTop: 55,
@@ -1566,6 +1578,50 @@ function getStyles(theme: AppTheme) {
       fontSize: 13,
       textAlign: "center",
       color: theme.textSecondary,
+    },
+
+    communityFooter: {
+      flex: 1,
+      marginLeft: 12,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 10,
+    },
+
+    ratingRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingHorizontal: 8,
+      paddingVertical: 5,
+      borderRadius: 10,
+      backgroundColor: "rgba(244,183,64,0.12)",
+    },
+
+    ratingText: {
+      marginLeft: 4,
+      fontSize: 13,
+      fontWeight: "800",
+      color: theme.text,
+    },
+
+    ratingCount: {
+      marginLeft: 3,
+      fontSize: 11,
+      color: theme.textSecondary,
+    },
+
+    openMixHint: {
+      flexDirection: "row",
+      alignItems: "center",
+      flexShrink: 0,
+    },
+
+    openMixHintText: {
+      marginRight: 5,
+      fontSize: 12,
+      fontWeight: "800",
+      color: theme.primary,
     },
   })
 }

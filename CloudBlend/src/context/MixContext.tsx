@@ -5,9 +5,15 @@ import {
   useContext,
   useEffect,
   useMemo,
+ 
   useState,
 } from "react"
+import {
 
+  Platform,
+ 
+} from "react-native"
+import { usePro } from "@/context/ProContext"
 import { useAuth } from "@/context/AuthContext"
 import { supabase } from "@/lib/supabase"
 
@@ -35,6 +41,8 @@ export type SavedMix = {
   likedByMe: boolean
   creatorUsername?: string
   creatorAvatarUrl?: string | null
+  averageRating: number
+ratingCount: number
   createdAt: string
   updatedAt: string
 }
@@ -154,6 +162,7 @@ const MIX_SELECT = `
     user_id
   )
 `
+const FREE_MIX_LIMIT = 5
 
 function buildRecipeKey(
   ingredients: SavedMixIngredient[]
@@ -390,7 +399,7 @@ export function MixProvider({
   children,
 }: MixProviderProps) {
   const { user } = useAuth()
-
+const { hasPro } = usePro()
   const [savedMixes, setSavedMixes] =
     useState<SavedMix[]>([])
   const [publicMixes, setPublicMixes] =
@@ -468,6 +477,25 @@ export function MixProvider({
           "You must be signed in to save a mix."
         )
       }
+
+      /*
+ * Free users can create up to five personal mixes.
+ * Saved community mixes are already gated by KloudIt Pro,
+ * so they won't reach this check.
+ */
+if (
+  !hasPro &&
+  !mix.sourceMixId &&
+  savedMixes.length >= FREE_MIX_LIMIT
+) {
+  if (Platform.OS === "web") {
+    window.alert(
+      `Limit reached!\n\nsavedMixes: ${savedMixes.length}`
+    )
+  }
+
+  throw new Error("PRO_REQUIRED")
+}
 
       const recipeKey = buildRecipeKey(
         mix.ingredients
@@ -599,7 +627,9 @@ export function MixProvider({
 
       return newMix
     },
-    [user]
+    [ user,
+  hasPro,
+  savedMixes,]
   )
 
   const deleteMix = useCallback(
