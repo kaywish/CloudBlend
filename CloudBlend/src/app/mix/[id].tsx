@@ -866,19 +866,30 @@ useEffect(() => {
             {mix.name}
           </Text>
 
-          {!isOwner && mix.creatorUsername ? (
-            <View style={styles.creatorRow}>
-              <Ionicons
-                name="person-circle-outline"
-                size={16}
-                color="rgba(255,255,255,0.82)"
-              />
+        {!isOwner && mix.creatorUsername ? (
+  <TouchableOpacity
+    style={styles.creatorRow}
+    activeOpacity={0.75}
+    onPress={() =>
+      router.push({
+        pathname: "/user/[id]",
+        params: {
+          id: mix.userId,
+        },
+      })
+    }
+  >
+    <Ionicons
+      name="person-circle-outline"
+      size={16}
+      color="rgba(255,255,255,0.75)"
+    />
 
-              <Text style={styles.creatorText}>
-                Mixed by @{mix.creatorUsername}
-              </Text>
-            </View>
-          ) : null}
+    <Text style={styles.creatorText}>
+      @{mix.creatorUsername}
+    </Text>
+  </TouchableOpacity>
+) : null}
 
           <View style={styles.createdRow}>
             <Ionicons

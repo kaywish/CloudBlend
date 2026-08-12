@@ -9,6 +9,7 @@ import { FlavorProvider } from "@/context/FlavorContext"
 import { MixProvider } from "@/context/MixContext"
 import { ProProvider } from "@/context/ProContext"
 import { ProfileProvider } from "@/context/ProfileContext"
+import { FollowProvider } from "@/context/FollowContext"
 
 function AppNavigator() {
   const { theme, resolvedTheme } = useAppTheme()
@@ -37,6 +38,7 @@ function AppNavigator() {
         <Stack.Screen name="reset-password" />
         <Stack.Screen name="flavor/[id]" />
         <Stack.Screen name="mix/[id]" />
+        <Stack.Screen name="user/[id]" />
 
         <Stack.Screen
           name="pro"
@@ -51,18 +53,20 @@ function AppNavigator() {
 
 export default function RootLayout() {
   return (
-    <AppThemeProvider>
-      <AuthProvider>
-        <ProProvider>
-          <ProfileProvider>
-            <MixProvider>
-              <FlavorProvider>
-                <AppNavigator />
-              </FlavorProvider>
-            </MixProvider>
-          </ProfileProvider>
-        </ProProvider>
-      </AuthProvider>
-    </AppThemeProvider>
+<AppThemeProvider>
+  <AuthProvider>
+    <ProProvider>
+      <FollowProvider>
+        <ProfileProvider>
+          <MixProvider>
+            <FlavorProvider>
+              <AppNavigator />
+            </FlavorProvider>
+          </MixProvider>
+        </ProfileProvider>
+      </FollowProvider>
+    </ProProvider>
+  </AuthProvider>
+</AppThemeProvider>
   )
 }

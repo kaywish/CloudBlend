@@ -62,41 +62,50 @@ export default function NotificationsScreen() {
   }, [loadNotifications])
 
   async function handleNotificationPress(
-    notification: AppNotification
-  ) {
+  notification: AppNotification
+) {
+  try {
     if (!notification.isRead) {
-      try {
-        await markNotificationRead(notification.id)
-
-        setNotifications((current) =>
-          current.map((item) =>
-            item.id === notification.id
-              ? {
-                  ...item,
-                  isRead: true,
-                }
-              : item
-          )
-        )
-      } catch (error) {
-        console.error(
-          "Could not mark notification as read:",
-          error
-        )
-      }
+     await markNotificationRead(notification.id)
     }
 
-    const flavorId = notification.data?.flavorId
-
-    if (typeof flavorId === "string") {
+    if (
+      notification.type === "follow" &&
+      notification.data?.actor_id
+    ) {
       router.push({
-        pathname: "/flavor/[id]",
+        pathname: "/user/[id]",
         params: {
-          id: flavorId,
+          id: notification.data.actor_id,
         },
       })
+
+      return
     }
+
+    if (
+      (
+        notification.type === "like" ||
+        notification.type === "review"
+      ) &&
+      notification.data?.mix_id
+    ) {
+      router.push({
+        pathname: "/mix/[id]",
+        params: {
+          id: notification.data.mix_id,
+        },
+      })
+
+      return
+    }
+  } catch (error) {
+    console.error(
+      "Could not open notification:",
+      error
+    )
   }
+}
 
   async function handleMarkAllRead() {
     try {
@@ -227,19 +236,33 @@ export default function NotificationsScreen() {
                     : styles.approvedIcon,
                 ]}
               >
-                <Ionicons
-                  name={
-                    notification.type === "photo-rejected"
-                      ? "close-circle-outline"
-                      : "checkmark-circle-outline"
-                  }
-                  size={24}
-                  color={
-                    notification.type === "photo-rejected"
-                      ? theme.danger
-                      : theme.primary
-                  }
-                />
+              <Ionicons
+  name={
+    notification.type === "follow"
+      ? "person-add-outline"
+      : notification.type === "like"
+      ? "heart"
+      : notification.type === "review"
+      ? "star"
+      : notification.type === "photo-approved"
+      ? "checkmark-circle-outline"
+      : notification.type === "photo-rejected"
+      ? "close-circle-outline"
+      : "notifications-outline"
+  }
+  size={24}
+  color={
+    notification.type === "like"
+      ? "#E34D67"
+      : notification.type === "review"
+      ? "#F4B740"
+      : notification.type === "follow"
+      ? theme.primary
+      : notification.type === "photo-rejected"
+      ? theme.danger
+      : theme.primary
+  }
+/>
               </View>
 
               <View style={styles.notificationContent}>

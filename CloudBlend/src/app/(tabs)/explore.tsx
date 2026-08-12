@@ -1,10 +1,12 @@
 import { Ionicons } from "@expo/vector-icons"
 import { router, useFocusEffect } from "expo-router"
-import { useCallback, useMemo, useState } from "react"
+import { useFollow } from "@/context/FollowContext"
 import {
   ActivityIndicator,
   FlatList,
   Image,
+  Modal,
+  Pressable,
   RefreshControl,
   StyleSheet,
   Text,
@@ -12,6 +14,13 @@ import {
   TouchableOpacity,
   View,
 } from "react-native"
+
+import {
+  useCallback,
+  useMemo,
+  useRef,
+  useState,
+} from "react"
 import { SafeAreaView } from "react-native-safe-area-context"
 
 import type { AppTheme } from "@/constants/colors"
@@ -19,12 +28,64 @@ import { useAppTheme } from "@/context/AppThemeContext"
 import { useFlavors } from "@/context/FlavorContext"
 import { useMixes } from "@/context/MixContext"
 
-type SortOption = "newest" | "popular"
+type SortOption =
+  | "newest"
+  | "popular"
+  | "trending"
+  | "following"
+
+  function getTrendingScore(mix: {
+  likeCount: number
+  averageRating: number
+  ratingCount: number
+  createdAt: string
+}) {
+  const ageMs =
+    Date.now() -
+    new Date(mix.createdAt).getTime()
+
+  const ageDays =
+    ageMs / (1000 * 60 * 60 * 24)
+
+  // Newer mixes get a temporary boost.
+  // Boost disappears after 7 days.
+  const recencyBoost =
+    Math.max(0, 7 - ageDays) * 2
+
+  const likeScore =
+    mix.likeCount * 3
+
+  const ratingCountScore =
+    mix.ratingCount * 2
+
+  const ratingQualityScore =
+    mix.ratingCount > 0
+      ? mix.averageRating * 3
+      : 0
+
+  return (
+    likeScore +
+    ratingCountScore +
+    ratingQualityScore +
+    recencyBoost
+  )
+}
+
+
 
 export default function ExploreScreen() {
-  const { theme } = useAppTheme()
-  const styles = useMemo(() => getStyles(theme), [theme])
+  const sortButtonRef = useRef<View>(null)
 
+const [sortMenuPosition, setSortMenuPosition] =
+  useState({
+    top: 0,
+    right: 18,
+  })
+  const { theme } = useAppTheme()
+  const [sortMenuVisible, setSortMenuVisible] =
+  useState(false)
+  const styles = useMemo(() => getStyles(theme), [theme])
+const { followingIds } = useFollow()
   const {
     publicMixes,
     isLoadingPublic,
@@ -57,53 +118,85 @@ export default function ExploreScreen() {
   )
 
   const displayedMixes = useMemo(() => {
-    const normalizedSearch = searchQuery
-      .trim()
-      .toLowerCase()
+  const normalizedSearch =
+    searchQuery.trim().toLowerCase()
 
-    let filteredMixes = publicMixes.filter((mix) => {
+  let filteredMixes = publicMixes.filter(
+    (mix) => {
       if (!normalizedSearch) {
         return true
       }
 
-      const matchesName = mix.name
-        .toLowerCase()
-        .includes(normalizedSearch)
+      const matchesName =
+        mix.name
+          .toLowerCase()
+          .includes(normalizedSearch)
 
-      const matchesCreator = mix.creatorUsername
-        ?.toLowerCase()
-        .includes(normalizedSearch)
+      const matchesCreator =
+        mix.creatorUsername
+          ?.toLowerCase()
+          .includes(normalizedSearch)
 
-      const matchesFlavor = mix.ingredients.some(
-        (ingredient) =>
-          ingredient.flavorName
-            .toLowerCase()
-            .includes(normalizedSearch) ||
-          ingredient.brand
-            ?.toLowerCase()
-            .includes(normalizedSearch)
+      const matchesFlavor =
+        mix.ingredients.some(
+          (ingredient) =>
+            ingredient.flavorName
+              .toLowerCase()
+              .includes(normalizedSearch) ||
+            ingredient.brand
+              ?.toLowerCase()
+              .includes(normalizedSearch)
+        )
+
+      return (
+        matchesName ||
+        matchesCreator ||
+        matchesFlavor
       )
+    }
+  )
 
-      return matchesName || matchesCreator || matchesFlavor
-    })
+  if (sortOption === "following") {
+    filteredMixes =
+      filteredMixes.filter((mix) =>
+        followingIds.includes(
+          mix.userId
+        )
+      )
+  }
 
+return [...filteredMixes].sort(
+  (a, b) => {
     if (sortOption === "popular") {
-      filteredMixes = filteredMixes.filter(
-        (mix) => mix.likeCount > 0
+      return (
+        b.likeCount -
+        a.likeCount
       )
     }
 
-    return [...filteredMixes].sort((a, b) => {
-      if (sortOption === "popular") {
-        return b.likeCount - a.likeCount
-      }
-
+    if (sortOption === "trending") {
       return (
-        new Date(b.updatedAt).getTime() -
-        new Date(a.updatedAt).getTime()
+        getTrendingScore(b) -
+        getTrendingScore(a)
       )
-    })
-  }, [publicMixes, searchQuery, sortOption])
+    }
+
+    return (
+      new Date(
+        b.updatedAt
+      ).getTime() -
+      new Date(
+        a.updatedAt
+      ).getTime()
+    )
+  }
+)
+}, [
+  publicMixes,
+  searchQuery,
+  sortOption,
+  followingIds,
+])
 
   const totalLikes = useMemo(
     () =>
@@ -506,106 +599,106 @@ export default function ExploreScreen() {
                 </Text>
               </View>
 
-              <View style={styles.sortContainer}>
-                <TouchableOpacity
-                  style={[
-                    styles.sortButton,
-                    sortOption === "newest" &&
-                      styles.sortButtonActive,
-                  ]}
-                  onPress={() => setSortOption("newest")}
-                >
-                  <Ionicons
-                    name="time-outline"
-                    size={15}
-                    color={
-                      sortOption === "newest"
-                        ? "#FFFFFF"
-                        : theme.textSecondary
-                    }
-                  />
+             <TouchableOpacity
+  ref={sortButtonRef}
+  style={styles.sortDropdownButton}
+  activeOpacity={0.8}
+  onPress={() => {
+    sortButtonRef.current?.measureInWindow(
+      (x, y, width, height) => {
+        setSortMenuPosition({
+          top: y + height + 6,
+          right: 18,
+        })
 
-                  <Text
-                    style={[
-                      styles.sortButtonText,
-                      sortOption === "newest" &&
-                        styles.sortButtonTextActive,
-                    ]}
-                  >
-                    New
-                  </Text>
-                </TouchableOpacity>
+        setSortMenuVisible(true)
+      }
+    )
+  }}
+>
+  <Ionicons
+    name={
+      sortOption === "newest"
+        ? "time-outline"
+        : sortOption === "popular"
+        ? "heart-outline"
+        : sortOption === "trending"
+        ? "flame"
+        : "people-outline"
+    }
+    size={16}
+    color={theme.primary}
+  />
 
-                <TouchableOpacity
-                  style={[
-                    styles.sortButton,
-                    sortOption === "popular" &&
-                      styles.sortButtonActive,
-                  ]}
-                  onPress={() => setSortOption("popular")}
-                >
-                  <Ionicons
-                    name="flame-outline"
-                    size={15}
-                    color={
-                      sortOption === "popular"
-                        ? "#FFFFFF"
-                        : theme.textSecondary
-                    }
-                  />
+  <Text style={styles.sortDropdownText}>
+    {sortOption === "newest"
+      ? "Newest"
+      : sortOption === "popular"
+      ? "Popular"
+      : sortOption === "trending"
+      ? "Trending"
+      : "Following"}
+  </Text>
 
-                  <Text
-                    style={[
-                      styles.sortButtonText,
-                      sortOption === "popular" &&
-                        styles.sortButtonTextActive,
-                    ]}
-                  >
-                    Popular
-                  </Text>
-                </TouchableOpacity>
-              </View>
+  <Ionicons
+    name={
+      sortMenuVisible
+        ? "chevron-up"
+        : "chevron-down"
+    }
+    size={16}
+    color={theme.textSecondary}
+  />
+</TouchableOpacity>
             </View>
           </View>
         }
         ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <View style={styles.emptyIconContainer}>
-              <Ionicons
-                name={
-                  searchQuery
-                    ? "search-outline"
-                    : "flask-outline"
-                }
-                size={40}
-                color={theme.primary}
-              />
-            </View>
-
-            <Text style={styles.emptyTitle}>
-              {searchQuery
-                ? "No matching mixes"
-                : "No public mixes yet"}
-            </Text>
-
-            <Text style={styles.emptyText}>
-              {searchQuery
-                ? "Try searching for a different mix, creator, flavor, or brand."
-                : "Publish one of your mixes to help start the KloudIt community."}
-            </Text>
-
-            {searchQuery ? (
-              <TouchableOpacity
-                style={styles.resetButton}
-                onPress={() => setSearchQuery("")}
-              >
-                <Text style={styles.resetButtonText}>
-                  Clear search
-                </Text>
-              </TouchableOpacity>
-            ) : null}
-          </View>
+  <View style={styles.emptyState}>
+    <View style={styles.emptyIconContainer}>
+      <Ionicons
+        name={
+          searchQuery
+            ? "search-outline"
+            : sortOption === "following"
+              ? "people-outline"
+              : "flask-outline"
         }
+        size={40}
+        color={theme.primary}
+      />
+    </View>
+
+    <Text style={styles.emptyTitle}>
+      {searchQuery
+        ? "No matching mixes"
+        : sortOption === "following"
+          ? "Nothing from people you follow"
+          : "No public mixes yet"}
+    </Text>
+
+    <Text style={styles.emptyText}>
+      {searchQuery
+        ? "Try searching for a different mix, creator, flavor, or brand."
+        : sortOption === "following"
+          ? followingIds.length === 0
+            ? "Follow creators from Explore to see their public mixes here."
+            : "The creators you follow haven't published any public mixes yet."
+          : "Publish one of your mixes to help start the KloudIt community."}
+    </Text>
+
+    {searchQuery ? (
+      <TouchableOpacity
+        style={styles.resetButton}
+        onPress={() => setSearchQuery("")}
+      >
+        <Text style={styles.resetButtonText}>
+          Clear search
+        </Text>
+      </TouchableOpacity>
+    ) : null}
+  </View>
+}
         renderItem={({ item, index }) => {
           const totalPercentage =
             item.ingredients.reduce(
@@ -636,49 +729,62 @@ export default function ExploreScreen() {
             >
               <View style={styles.cardAccent} />
 
-              <View style={styles.creatorRow}>
-                <View style={styles.creatorAvatar}>
-                  {item.creatorAvatarUrl ? (
-                    <Image
-                      source={{
-                        uri: item.creatorAvatarUrl,
-                      }}
-                      style={styles.creatorAvatarImage}
-                    />
-                  ) : (
-                    <Text style={styles.creatorInitial}>
-                      {creatorUsername
-                        .charAt(0)
-                        .toUpperCase()}
-                    </Text>
-                  )}
-                </View>
+              <TouchableOpacity
+  style={styles.creatorRow}
+  activeOpacity={0.75}
+  onPress={(event) => {
+    event.stopPropagation()
 
-                <View style={styles.creatorInfo}>
-                  <Text style={styles.creatorLabel}>
-                    MIXED BY
-                  </Text>
+    router.push({
+      pathname: "/user/[id]",
+      params: {
+        id: item.userId,
+      },
+    })
+  }}
+>
+  <View style={styles.creatorAvatar}>
+    {item.creatorAvatarUrl ? (
+      <Image
+        source={{
+          uri: item.creatorAvatarUrl,
+        }}
+        style={styles.creatorAvatarImage}
+      />
+    ) : (
+      <Text style={styles.creatorInitial}>
+        {creatorUsername
+          .charAt(0)
+          .toUpperCase()}
+      </Text>
+    )}
+  </View>
 
-                  <Text
-                    style={styles.creatorUsername}
-                    numberOfLines={1}
-                  >
-                    @{creatorUsername}
-                  </Text>
-                </View>
+  <View style={styles.creatorInfo}>
+    <Text style={styles.creatorLabel}>
+      MIXED BY
+    </Text>
 
-                <View style={styles.publicBadge}>
-                  <Ionicons
-                    name="earth-outline"
-                    size={14}
-                    color={theme.primaryDark}
-                  />
+    <Text
+      style={styles.creatorUsername}
+      numberOfLines={1}
+    >
+      @{creatorUsername}
+    </Text>
+  </View>
 
-                  <Text style={styles.publicBadgeText}>
-                    Public
-                  </Text>
-                </View>
-              </View>
+  <View style={styles.publicBadge}>
+    <Ionicons
+      name="earth-outline"
+      size={14}
+      color={theme.primaryDark}
+    />
+
+    <Text style={styles.publicBadgeText}>
+      Public
+    </Text>
+  </View>
+</TouchableOpacity>
 
               <View style={styles.creatorDivider} />
 
@@ -718,9 +824,10 @@ export default function ExploreScreen() {
                   </View>
                 </View>
 
-                {index === 0 &&
-                sortOption === "popular" &&
-                item.likeCount > 0 ? (
+              {index === 0 &&
+ sortOption === "trending" &&
+ (item.likeCount > 0 ||
+  item.ratingCount > 0) ? (
                   <View style={styles.trendingBadge}>
                     <Ionicons
                       name="flame"
@@ -728,9 +835,9 @@ export default function ExploreScreen() {
                       color="#E97930"
                     />
 
-                    <Text style={styles.trendingText}>
-                      Top
-                    </Text>
+                   <Text style={styles.trendingText}>
+  Trending
+</Text>
                   </View>
                 ) : (
                   <View style={styles.chevronContainer}>
@@ -878,6 +985,113 @@ export default function ExploreScreen() {
           )
         }}
       />
+      <Modal
+  visible={sortMenuVisible}
+  transparent
+  animationType="fade"
+  onRequestClose={() =>
+    setSortMenuVisible(false)
+  }
+>
+  <Pressable
+    style={styles.sortModalOverlay}
+    onPress={() =>
+      setSortMenuVisible(false)
+    }
+  >
+    <Pressable
+  style={[
+    styles.sortModalCard,
+    {
+      top: sortMenuPosition.top,
+      right: sortMenuPosition.right,
+    },
+  ]}
+  onPress={(e) =>
+    e.stopPropagation()
+  }
+>
+      <View style={styles.sortModalHeader}>
+        <Text style={styles.sortModalTitle}>
+          Sort Community Mixes
+        </Text>
+      </View>
+
+      {[
+        {
+          key: "newest",
+          label: "Newest",
+          icon: "time-outline",
+        },
+        {
+          key: "popular",
+          label: "Popular",
+          icon: "heart-outline",
+        },
+        {
+          key: "trending",
+          label: "Trending",
+          icon: "flame",
+        },
+        {
+          key: "following",
+          label: "Following",
+          icon: "people-outline",
+        },
+      ].map((option, index) => (
+        <View key={option.key}>
+          <TouchableOpacity
+            style={[
+              styles.sortOption,
+              sortOption === option.key &&
+                styles.sortOptionActive,
+            ]}
+            onPress={() => {
+              setSortOption(
+                option.key as SortOption
+              )
+              setSortMenuVisible(false)
+            }}
+          >
+            <Ionicons
+              name={option.icon as any}
+              size={20}
+              color={
+                sortOption === option.key
+                  ? theme.primary
+                  : theme.textSecondary
+              }
+            />
+
+            <Text
+              style={[
+                styles.sortOptionText,
+                sortOption === option.key &&
+                  styles.sortOptionTextActive,
+              ]}
+            >
+              {option.label}
+            </Text>
+
+            {sortOption === option.key && (
+              <Ionicons
+                name="checkmark"
+                size={20}
+                color={theme.primary}
+              />
+            )}
+          </TouchableOpacity>
+
+          {index < 3 && (
+            <View style={styles.sortDivider} />
+          )}
+        </View>
+      ))}
+
+    
+    </Pressable>
+  </Pressable>
+</Modal>
     </SafeAreaView>
   )
 }
@@ -1229,14 +1443,14 @@ function getStyles(theme: AppTheme) {
       backgroundColor: theme.card,
     },
 
-    sortButton: {
-      paddingHorizontal: 10,
-      paddingVertical: 8,
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 4,
-      borderRadius: 10,
-    },
+   sortButton: {
+  paddingHorizontal: 8,
+  paddingVertical: 8,
+  flexDirection: "row",
+  alignItems: "center",
+  gap: 3,
+  borderRadius: 10,
+},
 
     sortButtonActive: {
       backgroundColor: theme.primary,
@@ -1623,5 +1837,121 @@ function getStyles(theme: AppTheme) {
       fontWeight: "800",
       color: theme.primary,
     },
+
+    sortDropdownButton: {
+  height: 44,
+  paddingHorizontal: 14,
+  flexDirection: "row",
+  alignItems: "center",
+  alignSelf: "flex-start",
+
+  borderWidth: 1,
+  borderColor: theme.border,
+  borderRadius: 14,
+
+  backgroundColor: theme.card,
+
+  gap: 8,
+},
+
+sortDropdownText: {
+  fontSize: 14,
+  fontWeight: "700",
+  color: theme.text,
+},
+
+sortModalOverlay: {
+  flex: 1,
+  backgroundColor: "rgba(0,0,0,0.20)",
+},
+
+sortModalCard: {
+  position: "absolute",
+
+  width: 230,
+
+  borderRadius: 16,
+  borderWidth: 1,
+  borderColor: theme.border,
+
+  backgroundColor: theme.card,
+  overflow: "hidden",
+
+  elevation: 8,
+
+  shadowColor: "#000",
+  shadowOpacity: 0.15,
+  shadowRadius: 12,
+  shadowOffset: {
+    width: 0,
+    height: 6,
+  },
+},
+
+sortModalHeader: {
+  paddingHorizontal: 18,
+  paddingVertical: 16,
+
+  borderBottomWidth: 1,
+  borderBottomColor: theme.border,
+},
+
+sortModalTitle: {
+  fontSize: 16,
+  fontWeight: "800",
+  color: theme.text,
+},
+
+sortOption: {
+  height: 52,
+  paddingHorizontal: 16,
+
+  flexDirection: "row",
+  alignItems: "center",
+
+  gap: 12,
+},
+
+sortOptionActive: {
+  backgroundColor: theme.primaryLight,
+},
+
+sortOptionText: {
+  flex: 1,
+
+  fontSize: 15,
+  fontWeight: "600",
+
+  color: theme.text,
+},
+
+sortOptionTextActive: {
+  color: theme.primary,
+  fontWeight: "800",
+},
+
+sortDivider: {
+  height: StyleSheet.hairlineWidth,
+  backgroundColor: theme.border,
+},
+
+sortCloseButton: {
+  margin: 16,
+
+  height: 44,
+
+  borderRadius: 12,
+
+  alignItems: "center",
+  justifyContent: "center",
+
+  backgroundColor: theme.primary,
+},
+
+sortCloseButtonText: {
+  color: "#FFFFFF",
+  fontWeight: "700",
+  fontSize: 15,
+},
   })
 }

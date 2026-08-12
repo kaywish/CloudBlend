@@ -37,12 +37,15 @@ export type SavedMix = {
   sourceMixId?: string | null
   recipeKey?: string | null
   ingredients: SavedMixIngredient[]
+
   likeCount: number
   likedByMe: boolean
+
+  averageRating: number
+  ratingCount: number
+
   creatorUsername?: string
   creatorAvatarUrl?: string | null
-  averageRating: number
-ratingCount: number
   createdAt: string
   updatedAt: string
 }
@@ -97,6 +100,10 @@ type ProfileRow = {
   avatar_url: string | null
 }
 
+type MixReviewRow = {
+  rating: number
+}
+
 type MixRow = {
   id: string
   user_id: string
@@ -109,6 +116,7 @@ type MixRow = {
   updated_at: string
   mix_ingredients?: MixIngredientRow[] | null
   mix_likes?: MixLikeRow[] | null
+  mix_reviews?: MixReviewRow[] | null
 }
 
 type MixIngredientRow = {
@@ -149,6 +157,7 @@ const MIX_SELECT = `
   recipe_key,
   created_at,
   updated_at,
+
   mix_ingredients (
     id,
     mix_id,
@@ -158,8 +167,13 @@ const MIX_SELECT = `
     image,
     percentage
   ),
+
   mix_likes (
     user_id
+  ),
+
+  mix_reviews (
+    rating
   )
 `
 const FREE_MIX_LIMIT = 5
@@ -213,6 +227,18 @@ function mapMixRow(
   profile?: ProfileRow
 ): SavedMix {
   const likes = row.mix_likes ?? []
+  const reviews = row.mix_reviews ?? []
+
+  const ratingCount = reviews.length
+
+  const averageRating =
+    ratingCount > 0
+      ? reviews.reduce(
+          (total, review) =>
+            total + Number(review.rating),
+          0
+        ) / ratingCount
+      : 0
 
   return {
     id: row.id,
@@ -222,10 +248,13 @@ function mapMixRow(
     visibility: row.visibility,
     sourceMixId: row.source_mix_id,
     recipeKey: row.recipe_key,
-    ingredients: (row.mix_ingredients ?? []).map(
-      mapIngredientRow
-    ),
+
+    ingredients: (
+      row.mix_ingredients ?? []
+    ).map(mapIngredientRow),
+
     likeCount: likes.length,
+
     likedByMe: Boolean(
       currentUserId &&
         likes.some(
@@ -233,11 +262,17 @@ function mapMixRow(
             like.user_id === currentUserId
         )
     ),
+
+    averageRating,
+    ratingCount,
+
     creatorUsername:
       profile?.username?.trim() ||
-      "CloudBlend user",
+      "KloudIt user",
+
     creatorAvatarUrl:
       profile?.avatar_url ?? null,
+
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }
@@ -578,30 +613,37 @@ if (
       const creatorProfile =
         await fetchCreatorProfile(user.id)
 
-      const newMix: SavedMix = {
-        id: insertedMix.id,
-        userId: insertedMix.user_id,
-        name: insertedMix.name,
-        notes: insertedMix.notes ?? "",
-        visibility:
-          insertedMix.visibility,
-        sourceMixId:
-          insertedMix.source_mix_id,
-        recipeKey:
-          insertedMix.recipe_key,
-        ingredients: mix.ingredients,
-        likeCount: 0,
-        likedByMe: false,
-        creatorUsername:
-          creatorProfile?.username?.trim() ||
-          "CloudBlend user",
-        creatorAvatarUrl:
-          creatorProfile?.avatar_url ?? null,
-        createdAt:
-          insertedMix.created_at,
-        updatedAt:
-          insertedMix.updated_at,
-      }
+     const newMix: SavedMix = {
+  id: insertedMix.id,
+  userId: insertedMix.user_id,
+  name: insertedMix.name,
+  notes: insertedMix.notes ?? "",
+  visibility: insertedMix.visibility,
+
+  sourceMixId:
+    insertedMix.source_mix_id,
+
+  recipeKey:
+    insertedMix.recipe_key,
+
+  ingredients: mix.ingredients,
+
+  likeCount: 0,
+  likedByMe: false,
+
+  averageRating: 0,
+  ratingCount: 0,
+
+  creatorUsername:
+    creatorProfile?.username?.trim() ||
+    "KloudIt user",
+
+  creatorAvatarUrl:
+    creatorProfile?.avatar_url ?? null,
+
+  createdAt: insertedMix.created_at,
+  updatedAt: insertedMix.updated_at,
+}
 
       setSavedMixes((currentMixes) => [
         newMix,
