@@ -627,7 +627,7 @@ export default function FlavorDetailScreen() {
                       style={styles.photoCreditText}
                       numberOfLines={1}
                     >
-                      {photo.creditName || "CloudBlend community"}
+                      {photo.creditName || "KloudIt community"}
                     </Text>
                   </View>
                 </View>
@@ -1011,7 +1011,7 @@ export default function FlavorDetailScreen() {
 
                 <Text style={styles.permissionText}>
                   I took this photo or have permission to submit it,
-                  and I allow CloudBlend to display it publicly.
+                  and I allow KloudIt to display it publicly.
                 </Text>
               </TouchableOpacity>
 
@@ -1311,7 +1311,7 @@ function ReviewCard({
   styles: ReturnType<typeof getStyles>
 }) {
   const displayName =
-    item.displayName || item.username || "CloudBlend User"
+    item.displayName || item.username || "KloudIt User"
 
   const dateText = item.createdAt
     ? new Date(item.createdAt).toLocaleDateString()

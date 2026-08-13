@@ -1455,7 +1455,7 @@ function FlavorPickerModal({
 
     <Text style={styles.modalEmptyText}>
       This brand or flavor may not be in the
-      CloudBlend catalog yet.
+      KloudIt catalog yet.
     </Text>
 
     <TouchableOpacity

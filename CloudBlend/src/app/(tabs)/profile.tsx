@@ -397,13 +397,13 @@ async function handleRestorePurchases() {
           </View>
 
           <Text style={styles.guestTitle}>
-            Your CloudBlend Profile
+            Your KloudIt Profile
           </Text>
 
           <Text style={styles.guestSubtitle}>
             Sign in to create your profile, save mixes,
             publish blends, and connect with the
-            CloudBlend community.
+            KloudIt community.
           </Text>
 
           <View style={styles.guestFeatureCard}>
@@ -514,7 +514,7 @@ async function handleRestorePurchases() {
   }
 
   const visibleName =
-    profile?.displayName || profile?.username || "CloudBlend User"
+    profile?.displayName || profile?.username || "KloudIt User"
 
   return (
     <SafeAreaView style={styles.safeArea} edges={["top"]}>
@@ -535,7 +535,7 @@ async function handleRestorePurchases() {
         <View style={styles.topBar}>
           <View>
             <Text style={styles.pageEyebrow}>
-              YOUR CLOUDBLEND
+              YOUR KLOUDIT
             </Text>
             <Text style={styles.pageTitle}>Profile</Text>
           </View>
@@ -784,7 +784,7 @@ async function handleRestorePurchases() {
               Your Mixes
             </Text>
             <Text style={styles.sectionSubtitle}>
-              Your latest CloudBlend creations
+              Your latest KloudIt creations
             </Text>
           </View>
 
@@ -1231,7 +1231,7 @@ async function handleRestorePurchases() {
             </Text>
 
             <Text style={styles.appearanceSubtitle}>
-              Choose how CloudBlend looks on this device.
+              Choose how KloudIt looks on this device.
             </Text>
 
             {(

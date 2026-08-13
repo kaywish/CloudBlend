@@ -451,7 +451,7 @@ function confirmRejection(
                     <Text style={styles.detailText}>
                       Submitted by{" "}
                       {submission.submitterName ??
-                        "CloudBlend user"}
+                        "KloudIt user"}
                     </Text>
                   </View>
 

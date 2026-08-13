@@ -44,8 +44,11 @@ export type SavedMix = {
   averageRating: number
   ratingCount: number
 
+  saveCount: number
+
   creatorUsername?: string
   creatorAvatarUrl?: string | null
+
   createdAt: string
   updatedAt: string
 }
@@ -117,6 +120,7 @@ type MixRow = {
   mix_ingredients?: MixIngredientRow[] | null
   mix_likes?: MixLikeRow[] | null
   mix_reviews?: MixReviewRow[] | null
+  save_count: number
 }
 
 type MixIngredientRow = {
@@ -155,6 +159,7 @@ const MIX_SELECT = `
   visibility,
   source_mix_id,
   recipe_key,
+  save_count,
   created_at,
   updated_at,
 
@@ -224,7 +229,8 @@ function mapIngredientRow(
 function mapMixRow(
   row: MixRow,
   currentUserId?: string,
-  profile?: ProfileRow
+  profile?: ProfileRow,
+  saveCount = 0
 ): SavedMix {
   const likes = row.mix_likes ?? []
   const reviews = row.mix_reviews ?? []
@@ -265,6 +271,7 @@ function mapMixRow(
 
     averageRating,
     ratingCount,
+   saveCount: Number(row.save_count ?? 0),
 
     creatorUsername:
       profile?.username?.trim() ||
@@ -351,6 +358,8 @@ async function fetchCreatorProfiles(
   return profilesById
 }
 
+
+
 async function fetchCreatorProfile(
   userId: string
 ): Promise<ProfileRow | undefined> {
@@ -416,18 +425,19 @@ async function fetchMixes(
     return []
   }
 
-  const profilesById =
-    await fetchCreatorProfiles(
-      mixRows.map((row) => row.user_id)
-    )
-
-  return mixRows.map((row) =>
-    mapMixRow(
-      row,
-      currentUserId,
-      profilesById.get(row.user_id)
-    )
+  
+const profilesById =
+  await fetchCreatorProfiles(
+    mixRows.map((row) => row.user_id)
   )
+
+return mixRows.map((row) =>
+  mapMixRow(
+    row,
+    currentUserId,
+    profilesById.get(row.user_id)
+  )
+)
 }
 
 export function MixProvider({
@@ -633,6 +643,7 @@ if (
 
   averageRating: 0,
   ratingCount: 0,
+  saveCount: 0,
 
   creatorUsername:
     creatorProfile?.username?.trim() ||

@@ -135,7 +135,7 @@ function mapSubmission(
     submitterName:
       profile?.display_name ??
       profile?.username ??
-      "CloudBlend user",
+      "KloudIt user",
 
     submitterAvatarUrl:
       profile?.avatar_url ?? null,
@@ -436,7 +436,7 @@ export async function approveCatalogSubmission({
     userId: submission.submittedBy,
     type: "catalog_submission_approved",
     title: "Brand & Flavor Approved",
-    message: `${flavorName} was approved and is now available in CloudBlend.`,
+    message: `${flavorName} was approved and is now available in KloudIt.`,
     data: {
       flavorId,
       brandId,

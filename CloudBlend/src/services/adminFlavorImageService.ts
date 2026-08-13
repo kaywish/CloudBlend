@@ -82,7 +82,7 @@ function mapSubmission(
     submitterName:
       row.profiles?.display_name ??
       row.profiles?.username ??
-      "CloudBlend user",
+      "KloudIt user",
 
     submitterAvatarUrl:
       row.profiles?.avatar_url ?? null,

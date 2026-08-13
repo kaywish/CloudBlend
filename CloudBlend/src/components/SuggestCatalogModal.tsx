@@ -266,7 +266,7 @@ async function selectFlavorImage() {
       console.log("Flavor already exists!")
     Alert.alert(
       "Flavor Already Exists",
-      `${existingFlavor.brandName} ${existingFlavor.name} is already in the CloudBlend catalog. You can select it from the flavor list instead.`
+      `${existingFlavor.brandName} ${existingFlavor.name} is already in the KloudIt catalog. You can select it from the flavor list instead.`
     )
 
     return
@@ -276,7 +276,7 @@ async function selectFlavorImage() {
     "Could Not Check Flavor",
     error instanceof Error
       ? error.message
-      : "CloudBlend could not check whether this flavor already exists."
+      : "KloudIt could not check whether this flavor already exists."
   )
 
   return
@@ -391,7 +391,7 @@ if (alreadyPending) {
 
             <Text style={styles.infoText}>
               Once approved, this brand and flavor
-              will appear in the CloudBlend catalog
+              will appear in the KloudIt catalog
               for everyone.
             </Text>
           </View>

@@ -131,7 +131,7 @@ export default function CatalogSubmissionsScreen() {
 
   const confirmed = await confirmAction(
     "Approve Submission",
-    `Approve ${submission.proposedFlavorName} and add it to the CloudBlend catalog?`
+    `Approve ${submission.proposedFlavorName} and add it to the KloudIt catalog?`
   )
 
   if (!confirmed) {
@@ -155,12 +155,12 @@ export default function CatalogSubmissionsScreen() {
 
     if (Platform.OS === "web") {
       window.alert(
-        "The brand and flavor are now available in CloudBlend."
+        "The brand and flavor are now available in KloudIt."
       )
     } else {
       Alert.alert(
         "Approved",
-        "The brand and flavor are now available in CloudBlend."
+        "The brand and flavor are now available in KloudIt."
       )
     }
   } catch (error) {

@@ -238,6 +238,13 @@ export default function AuthScreen() {
             )
             break
 
+            case "email_already_exists":
+  showError(
+    "Email Already Registered",
+    "An account already exists with this email. Please sign in instead."
+  )
+  break
+
           case "username_unavailable":
             setUsernameStatus("unavailable")
             setUsernameMessage(result.error)
@@ -262,16 +269,16 @@ export default function AuthScreen() {
       if (isSignUp) {
         if (result.requiresEmailConfirmation) {
           Alert.alert(
-            "Check Your Email",
-            "Your account was created. Confirm your email, then return to CloudBlend and sign in."
-          )
+  "Check Your Email",
+  "If this email can be used to create a KloudIt account, we've sent a confirmation link. If you already have an account, sign in instead."
+)
 
           resetFormForMode(false)
           return
         }
 
         Alert.alert(
-          "Welcome to CloudBlend",
+          "Welcome to KloudIt",
           "Your account was created successfully."
         )
       }
@@ -285,7 +292,7 @@ export default function AuthScreen() {
 
       showError(
         "Connection Error",
-        "CloudBlend could not connect. Check your internet connection and try again."
+        "KloudIt could not connect. Check your internet connection and try again."
       )
     } finally {
       setIsSubmitting(false)
@@ -345,7 +352,7 @@ export default function AuthScreen() {
               </View>
             </View>
 
-            <Text style={styles.appName}>CloudBlend</Text>
+            <Text style={styles.appName}>KloudIt</Text>
 
             <Text style={styles.heroTitle}>
               {isSignUp
@@ -686,7 +693,7 @@ export default function AuthScreen() {
           </View>
 
           <Text style={styles.footerText}>
-            By continuing, you agree to CloudBlend’s Terms
+            By continuing, you agree to KloudIt Terms
             of Service and Privacy Policy.
           </Text>
         </ScrollView>

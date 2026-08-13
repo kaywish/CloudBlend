@@ -315,7 +315,7 @@ useEffect(() => {
               </Text>
 
               <Text style={styles.heroSubtitle}>
-                Browse the CloudBlend library and find
+                Browse the KloudIt library and find
                 the perfect combination for your next mix.
               </Text>
             </View>

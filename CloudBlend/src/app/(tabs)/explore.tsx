@@ -32,12 +32,14 @@ type SortOption =
   | "newest"
   | "popular"
   | "trending"
+  | "saved"
   | "following"
 
-  function getTrendingScore(mix: {
+function getTrendingScore(mix: {
   likeCount: number
   averageRating: number
   ratingCount: number
+  saveCount: number
   createdAt: string
 }) {
   const ageMs =
@@ -47,8 +49,6 @@ type SortOption =
   const ageDays =
     ageMs / (1000 * 60 * 60 * 24)
 
-  // Newer mixes get a temporary boost.
-  // Boost disappears after 7 days.
   const recencyBoost =
     Math.max(0, 7 - ageDays) * 2
 
@@ -63,10 +63,14 @@ type SortOption =
       ? mix.averageRating * 3
       : 0
 
+  const saveScore =
+    mix.saveCount * 5
+
   return (
     likeScore +
     ratingCountScore +
     ratingQualityScore +
+    saveScore +
     recencyBoost
   )
 }
@@ -117,7 +121,7 @@ const { followingIds } = useFollow()
     }, [refreshFlavors, refreshPublicMixes])
   )
 
-  const displayedMixes = useMemo(() => {
+ const displayedMixes = useMemo(() => {
   const normalizedSearch =
     searchQuery.trim().toLowerCase()
 
@@ -157,21 +161,25 @@ const { followingIds } = useFollow()
   )
 
   if (sortOption === "following") {
-    filteredMixes =
-      filteredMixes.filter((mix) =>
-        followingIds.includes(
-          mix.userId
-        )
-      )
+    filteredMixes = filteredMixes.filter(
+      (mix) =>
+        followingIds.includes(mix.userId)
+    )
   }
 
-return [...filteredMixes].sort(
-  (a, b) => {
+  if (sortOption === "saved") {
+    filteredMixes = filteredMixes.filter(
+      (mix) => mix.saveCount > 0
+    )
+  }
+
+  return [...filteredMixes].sort((a, b) => {
     if (sortOption === "popular") {
-      return (
-        b.likeCount -
-        a.likeCount
-      )
+      return b.likeCount - a.likeCount
+    }
+
+    if (sortOption === "saved") {
+      return b.saveCount - a.saveCount
     }
 
     if (sortOption === "trending") {
@@ -182,15 +190,10 @@ return [...filteredMixes].sort(
     }
 
     return (
-      new Date(
-        b.updatedAt
-      ).getTime() -
-      new Date(
-        a.updatedAt
-      ).getTime()
+      new Date(b.updatedAt).getTime() -
+      new Date(a.updatedAt).getTime()
     )
-  }
-)
+  })
 }, [
   publicMixes,
   searchQuery,
@@ -619,26 +622,30 @@ return [...filteredMixes].sort(
   <Ionicons
     name={
       sortOption === "newest"
-        ? "time-outline"
-        : sortOption === "popular"
-        ? "heart-outline"
-        : sortOption === "trending"
-        ? "flame"
-        : "people-outline"
-    }
+      ? "time-outline"
+      : sortOption === "popular"
+      ? "heart-outline"
+      : sortOption === "trending"
+      ? "flame"
+      : sortOption === "saved"
+      ? "bookmark-outline"
+      : "people-outline"
+  }
     size={16}
     color={theme.primary}
   />
 
-  <Text style={styles.sortDropdownText}>
-    {sortOption === "newest"
-      ? "Newest"
-      : sortOption === "popular"
-      ? "Popular"
-      : sortOption === "trending"
-      ? "Trending"
-      : "Following"}
-  </Text>
+ <Text style={styles.sortDropdownText}>
+  {sortOption === "newest"
+    ? "Newest"
+    : sortOption === "popular"
+    ? "Popular"
+    : sortOption === "trending"
+    ? "Trending"
+    : sortOption === "saved"
+    ? "Most Saved"
+    : "Following"}
+</Text>
 
   <Ionicons
     name={
@@ -968,6 +975,18 @@ return [...filteredMixes].sort(
                     ) : null}
                   </View>
 
+                  <View style={styles.saveStat}>
+  <Ionicons
+    name="bookmark-outline"
+    size={14}
+    color={theme.primary}
+  />
+
+  <Text style={styles.saveStatText}>
+    {item.saveCount}
+  </Text>
+</View>
+
                   <View style={styles.openMixHint}>
                     <Text style={styles.openMixHintText}>
                       View Mix
@@ -1038,6 +1057,11 @@ return [...filteredMixes].sort(
           label: "Following",
           icon: "people-outline",
         },
+        {
+  key: "saved",
+  label: "Most Saved",
+  icon: "bookmark-outline",
+},
       ].map((option, index) => (
         <View key={option.key}>
           <TouchableOpacity
@@ -1952,6 +1976,18 @@ sortCloseButtonText: {
   color: "#FFFFFF",
   fontWeight: "700",
   fontSize: 15,
+},
+
+saveStat: {
+  flexDirection: "row",
+  alignItems: "center",
+  gap: 4,
+},
+
+saveStatText: {
+  fontSize: 12,
+  fontWeight: "700",
+  color: theme.textSecondary,
 },
   })
 }

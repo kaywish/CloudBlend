@@ -313,104 +313,124 @@ export function AuthProvider({
     []
   )
 
-  const signUp = useCallback(
-    async (
-      username: string,
-      email: string,
-      password: string
-    ): Promise<AuthResult> => {
-      const normalizedUsername =
-        normalizeUsername(username)
+ const signUp = useCallback(
+  async (
+    username: string,
+    email: string,
+    password: string
+  ): Promise<AuthResult> => {
+    const normalizedUsername =
+      normalizeUsername(username)
 
-      const usernameCheck =
-        await checkUsernameAvailability(
-          normalizedUsername
-        )
+    const usernameCheck =
+      await checkUsernameAvailability(
+        normalizedUsername
+      )
 
-      if (!usernameCheck.available) {
-        return {
-          error:
-            usernameCheck.error ??
-            "That username is unavailable.",
-          errorCode: "username_unavailable",
-          requiresEmailConfirmation: false,
-        }
-      }
-
-      const { data, error } =
-        await supabase.auth.signUp({
-          email: normalizeEmail(email),
-          password,
-          options: {
-            data: {
-              username: normalizedUsername,
-            },
-          },
-        })
-
-      if (error) {
-        return {
-          error: getFriendlyAuthError(
-            error.message,
-            error.code
-          ),
-          errorCode: error.code ?? null,
-          requiresEmailConfirmation: false,
-        }
-      }
-
+    if (!usernameCheck.available) {
       return {
-        error: null,
-        errorCode: null,
-        requiresEmailConfirmation: Boolean(
-          data.user && !data.session
-        ),
+        error:
+          usernameCheck.error ??
+          "That username is unavailable.",
+        errorCode: "username_unavailable",
+        requiresEmailConfirmation: false,
       }
-    },
-    [checkUsernameAvailability]
-  )
+    }
+
+    const { data, error } =
+      await supabase.auth.signUp({
+        email: normalizeEmail(email),
+        password,
+        options: {
+          emailRedirectTo: "kloudit://login",
+
+          data: {
+            username: normalizedUsername,
+          },
+        },
+      })
+
+    if (error) {
+  const message = error.message.toLowerCase()
+
+  if (
+    message.includes("already registered") ||
+    message.includes("already been registered") ||
+    message.includes("user already registered")
+  ) {
+    return {
+      error:
+        "An account already exists with this email. Please sign in instead.",
+      errorCode: "email_already_exists",
+      requiresEmailConfirmation: false,
+    }
+  }
+
+  return {
+    error: getFriendlyAuthError(
+      error.message,
+      error.code
+    ),
+    errorCode: error.code ?? null,
+    requiresEmailConfirmation: false,
+  }
+}
+
+    return {
+      error: null,
+      errorCode: null,
+      requiresEmailConfirmation: Boolean(
+        data.user && !data.session
+      ),
+    }
+  },
+  [checkUsernameAvailability]
+)
 
   const sendPasswordResetEmail = useCallback(
-    async (email: string): Promise<PasswordResetResult> => {
-      const redirectTo =
-        Linking.createURL("/reset-password")
-
-      const { error } =
-        await supabase.auth.resetPasswordForEmail(
-          normalizeEmail(email),
-          {
-            redirectTo,
-          }
-        )
-
-      if (error) {
-        const isRateLimited =
-          error.code === "over_email_send_rate_limit" ||
-          error.message
-            .toLowerCase()
-            .includes("email rate limit exceeded")
-
-        return {
-          error: getFriendlyAuthError(
-            error.message,
-            error.code
-          ),
-          errorCode:
-            error.code ??
-            (isRateLimited
-              ? "over_email_send_rate_limit"
-              : null),
-          retryAfterSeconds: isRateLimited ? 60 : undefined,
+  async (
+    email: string
+  ): Promise<PasswordResetResult> => {
+    const { error } =
+      await supabase.auth.resetPasswordForEmail(
+        normalizeEmail(email),
+        {
+          redirectTo: "kloudit://reset-password",
         }
-      }
+      )
+
+    if (error) {
+      const isRateLimited =
+        error.code ===
+          "over_email_send_rate_limit" ||
+        error.message
+          .toLowerCase()
+          .includes(
+            "email rate limit exceeded"
+          )
 
       return {
-        error: null,
-        errorCode: null,
+        error: getFriendlyAuthError(
+          error.message,
+          error.code
+        ),
+        errorCode:
+          error.code ??
+          (isRateLimited
+            ? "over_email_send_rate_limit"
+            : null),
+        retryAfterSeconds:
+          isRateLimited ? 60 : undefined,
       }
-    },
-    []
-  )
+    }
+
+    return {
+      error: null,
+      errorCode: null,
+    }
+  },
+  []
+)
 
   const updatePassword = useCallback(
     async (password: string) => {

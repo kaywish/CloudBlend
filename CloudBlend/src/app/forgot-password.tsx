@@ -149,8 +149,8 @@ export default function ForgotPasswordScreen() {
 
             <Text style={styles.subtitle}>
               {emailSent
-                ? `We sent password reset instructions to ${normalizedEmail}.`
-                : "Enter the email connected to your CloudBlend account and we’ll send you a reset link."}
+                ? `If an account exists for ${normalizedEmail}, we sent password reset instructions.`
+                : "Enter the email connected to your KloudIt account and we’ll send you a reset link."}
             </Text>
 
             <View style={styles.card}>
