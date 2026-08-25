@@ -274,9 +274,9 @@ useFocusEffect(
             </Text>
 
             <Text style={styles.logo}>
-              Cloud
+              Kloud
               <Text style={styles.logoAccent}>
-                Blend
+                It
               </Text>
             </Text>
           </View>

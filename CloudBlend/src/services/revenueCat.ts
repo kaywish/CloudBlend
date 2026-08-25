@@ -26,10 +26,9 @@ export async function configureRevenueCat() {
       : ANDROID_API_KEY
 
   if (!apiKey) {
-    console.warn(
+    throw new Error(
       `Missing RevenueCat API key for ${Platform.OS}.`
     )
-    return
   }
 
   Purchases.setLogLevel(LOG_LEVEL.DEBUG)
@@ -39,6 +38,10 @@ export async function configureRevenueCat() {
   })
 
   isConfigured = true
+
+  console.log(
+    `RevenueCat configured for ${Platform.OS}`
+  )
 }
 
 export async function identifyRevenueCatUser(
@@ -48,7 +51,10 @@ export async function identifyRevenueCatUser(
     return null
   }
 
+  await configureRevenueCat()
+
   const result = await Purchases.logIn(userId)
+
   return result.customerInfo
 }
 
@@ -57,6 +63,8 @@ export async function logOutRevenueCatUser() {
     return
   }
 
+  await configureRevenueCat()
+
   await Purchases.logOut()
 }
 
@@ -64,6 +72,8 @@ export async function getRevenueCatCustomerInfo() {
   if (Platform.OS === "web") {
     return null
   }
+
+  await configureRevenueCat()
 
   return Purchases.getCustomerInfo()
 }
@@ -75,21 +85,23 @@ export async function getCurrentOfferingPackage(): Promise<
     return null
   }
 
-  const offerings = await Purchases.getOfferings()
+  await configureRevenueCat()
 
-  return (
-    offerings.current?.monthly ??
-    offerings.current?.availablePackages?.[0] ??
-    null
-  )
+  const offerings =
+    await Purchases.getOfferings()
+
+  return offerings.current?.monthly ?? null
 }
 
 export async function purchaseRevenueCatPackage(
   selectedPackage: PurchasesPackage
 ): Promise<CustomerInfo> {
-  const result = await Purchases.purchasePackage(
-    selectedPackage
-  )
+  await configureRevenueCat()
+
+  const result =
+    await Purchases.purchasePackage(
+      selectedPackage
+    )
 
   return result.customerInfo
 }
@@ -98,6 +110,8 @@ export async function restoreRevenueCatPurchases() {
   if (Platform.OS === "web") {
     return null
   }
+
+  await configureRevenueCat()
 
   return Purchases.restorePurchases()
 }

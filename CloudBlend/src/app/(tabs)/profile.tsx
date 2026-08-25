@@ -25,6 +25,7 @@ import { ThemeMode, useAppTheme } from "@/context/AppThemeContext"
 import { useMixes } from "@/context/MixContext"
 import { useProfile } from "@/context/ProfileContext"
 import { getUnreadNotificationCount } from "@/services/notificationService"
+import { supabase } from "@/lib/supabase"
 
 function getInitials(
   displayName?: string,
@@ -99,21 +100,6 @@ export default function ProfileScreen() {
     removeAvatar,
   } = useProfile()
 
-  const FREE_MIX_LIMIT = 5
-
-const personalMixCount = useMemo(
-  () =>
-    savedMixes.filter(
-      (mix) => !mix.sourceMixId
-    ).length,
-  [savedMixes]
-)
-
-const freeMixProgress = Math.min(
-  personalMixCount / FREE_MIX_LIMIT,
-  1
-)
-
   const [isRefreshing, setIsRefreshing] =
     useState(false)
   const [editVisible, setEditVisible] =
@@ -125,6 +111,8 @@ const freeMixProgress = Math.min(
     useState("")
   const [bio, setBio] = useState("")
   const [unreadCount, setUnreadCount] = useState(0)
+  const [isDeletingAccount, setIsDeletingAccount] =
+    useState(false)
 
   const publicMixCount = useMemo(
     () =>
@@ -369,6 +357,94 @@ async function handleRestorePurchases() {
           text: "Sign Out",
           style: "destructive",
           onPress: performSignOut,
+        },
+      ]
+    )
+  }
+
+  async function performDeleteAccount() {
+    if (!user || isDeletingAccount) {
+      return
+    }
+
+    try {
+      setIsDeletingAccount(true)
+
+      const { data, error } =
+        await supabase.functions.invoke(
+          "delete-account"
+        )
+
+      if (error) {
+        throw error
+      }
+
+      if (!data?.success) {
+        throw new Error(
+          data?.error ??
+            "Your account could not be deleted."
+        )
+      }
+
+      // The server-side user is gone. Clear the local
+      // KloudIt session so no stale auth state remains.
+      try {
+        await signOut()
+      } catch (error) {
+        console.log(
+          "Could not clear local session after account deletion:",
+          error
+        )
+      }
+
+      router.replace("/auth")
+    } catch (error: any) {
+      console.error(
+        "Could not delete KloudIt account:",
+        error
+      )
+
+      showProfileMessage(
+        "Could Not Delete Account",
+        error?.message ??
+          "Your account could not be deleted. Please try again."
+      )
+    } finally {
+      setIsDeletingAccount(false)
+    }
+  }
+
+  function handleDeleteAccount() {
+    const message = hasPro
+      ? "This permanently deletes your KloudIt account, profile, mixes, and associated account data. Deleting your KloudIt account does not automatically cancel your App Store subscription. This action cannot be undone."
+      : "This permanently deletes your KloudIt account, profile, mixes, and associated account data. This action cannot be undone."
+
+    if (Platform.OS === "web") {
+      const confirmed = window.confirm(
+        `Delete Account?\n\n${message}`
+      )
+
+      if (confirmed) {
+        void performDeleteAccount()
+      }
+
+      return
+    }
+
+    Alert.alert(
+      "Delete Account?",
+      message,
+      [
+        {
+          text: "Cancel",
+          style: "cancel",
+        },
+        {
+          text: "Delete Forever",
+          style: "destructive",
+          onPress: () => {
+            void performDeleteAccount()
+          },
         },
       ]
     )
@@ -699,84 +775,6 @@ async function handleRestorePurchases() {
             </Text>
           </View>
         </View>
-
-        <View style={styles.planCard}>
-  <View style={styles.planHeader}>
-    <View style={styles.planIcon}>
-      <Ionicons
-        name={hasPro ? "diamond" : "flask-outline"}
-        size={21}
-        color="#FFFFFF"
-      />
-    </View>
-
-    <View style={styles.planHeaderContent}>
-      <Text style={styles.planEyebrow}>
-        {hasPro ? "KLOUDIT PRO" : "FREE PLAN"}
-      </Text>
-
-      <Text style={styles.planTitle}>
-        {hasPro
-          ? "Unlimited mixes"
-          : `${personalMixCount} of ${FREE_MIX_LIMIT} mixes used`}
-      </Text>
-    </View>
-
-    {hasPro ? (
-      <View style={styles.planActiveBadge}>
-        <Text style={styles.planActiveBadgeText}>
-          PRO
-        </Text>
-      </View>
-    ) : null}
-  </View>
-
-  {!hasPro ? (
-    <>
-      <View style={styles.planProgressTrack}>
-        <View
-          style={[
-            styles.planProgressFill,
-            {
-              width: `${freeMixProgress * 100}%`,
-            },
-          ]}
-        />
-      </View>
-
-      <View style={styles.planBottomRow}>
-        <Text style={styles.planDescription}>
-          {personalMixCount >= FREE_MIX_LIMIT
-            ? "You've reached your free mix limit."
-            : `${FREE_MIX_LIMIT - personalMixCount} ${
-                FREE_MIX_LIMIT - personalMixCount === 1
-                  ? "mix"
-                  : "mixes"
-              } remaining`}
-        </Text>
-
-        <TouchableOpacity
-          style={styles.planUpgradeButton}
-          onPress={() => router.push("/pro")}
-        >
-          <Ionicons
-            name="sparkles"
-            size={14}
-            color="#FFFFFF"
-          />
-
-          <Text style={styles.planUpgradeButtonText}>
-            Upgrade
-          </Text>
-        </TouchableOpacity>
-      </View>
-    </>
-  ) : (
-    <Text style={styles.planDescription}>
-      Create and save as many personal mixes as you want.
-    </Text>
-  )}
-</View>
 
         <View style={styles.sectionHeader}>
           <View>
@@ -1120,6 +1118,63 @@ async function handleRestorePurchases() {
                 size={19}
                 color={palette.muted}
               />
+            </TouchableOpacity>
+
+            <View style={styles.divider} />
+
+            <TouchableOpacity
+              style={[
+                styles.accountRow,
+                isDeletingAccount && styles.disabledButton,
+              ]}
+              activeOpacity={0.8}
+              onPress={handleDeleteAccount}
+              disabled={isDeletingAccount}
+            >
+              <View
+                style={[
+                  styles.accountIcon,
+                  styles.deleteAccountIcon,
+                ]}
+              >
+                {isDeletingAccount ? (
+                  <ActivityIndicator
+                    size="small"
+                    color={palette.danger}
+                  />
+                ) : (
+                  <Ionicons
+                    name="trash-outline"
+                    size={20}
+                    color={palette.danger}
+                  />
+                )}
+              </View>
+
+              <View style={styles.accountText}>
+                <Text
+                  style={[
+                    styles.accountLabel,
+                    styles.deleteAccountText,
+                  ]}
+                >
+                  {isDeletingAccount
+                    ? "Deleting Account..."
+                    : "Delete Account"}
+                </Text>
+
+                <Text style={styles.accountValue}>
+                  Permanently delete your account and data
+                </Text>
+              </View>
+
+              {!isDeletingAccount ? (
+                <Ionicons
+                  name="chevron-forward"
+                  size={19}
+                  color={palette.muted}
+                />
+              ) : null}
             </TouchableOpacity>
 
             <View style={styles.proCard}>
@@ -2013,6 +2068,12 @@ function getStyles(palette: ProfilePalette) {
   signOutText: {
     color: palette.danger,
   },
+  deleteAccountIcon: {
+    backgroundColor: `${palette.danger}18`,
+  },
+  deleteAccountText: {
+    color: palette.danger,
+  },
   divider: {
     height: 1,
     marginLeft: 54,
@@ -2363,107 +2424,7 @@ disabledButton: {
   opacity: 0.6,
 },
 
-planCard: {
-  marginHorizontal: 18,
-  marginTop: 18,
-  padding: 18,
-  borderRadius: 22,
-  borderWidth: 1,
-  borderColor: palette.border,
-  backgroundColor: palette.card,
-},
 
-planHeader: {
-  flexDirection: "row",
-  alignItems: "center",
-  gap: 12,
-},
-
-planIcon: {
-  width: 44,
-  height: 44,
-  alignItems: "center",
-  justifyContent: "center",
-  borderRadius: 14,
-  backgroundColor: palette.primary,
-},
-
-planHeaderContent: {
-  flex: 1,
-},
-
-planEyebrow: {
-  fontSize: 9,
-  fontWeight: "900",
-  letterSpacing: 1.2,
-  color: palette.primary,
-},
-
-planTitle: {
-  marginTop: 3,
-  fontSize: 17,
-  fontWeight: "900",
-  color: palette.text,
-},
-
-planActiveBadge: {
-  paddingHorizontal: 9,
-  paddingVertical: 5,
-  borderRadius: 10,
-  backgroundColor: palette.success,
-},
-
-planActiveBadgeText: {
-  fontSize: 9,
-  fontWeight: "900",
-  color: "#FFFFFF",
-},
-
-planProgressTrack: {
-  height: 8,
-  marginTop: 17,
-  overflow: "hidden",
-  borderRadius: 4,
-  backgroundColor: palette.border,
-},
-
-planProgressFill: {
-  height: "100%",
-  borderRadius: 4,
-  backgroundColor: palette.primary,
-},
-
-planBottomRow: {
-  marginTop: 12,
-  flexDirection: "row",
-  alignItems: "center",
-  justifyContent: "space-between",
-  gap: 12,
-},
-
-planDescription: {
-  flex: 1,
-  marginTop: 10,
-  fontSize: 12,
-  lineHeight: 18,
-  color: palette.muted,
-},
-
-planUpgradeButton: {
-  paddingHorizontal: 13,
-  paddingVertical: 9,
-  flexDirection: "row",
-  alignItems: "center",
-  gap: 5,
-  borderRadius: 12,
-  backgroundColor: palette.primary,
-},
-
-planUpgradeButtonText: {
-  fontSize: 11,
-  fontWeight: "900",
-  color: "#FFFFFF",
-},
   
 })
 }

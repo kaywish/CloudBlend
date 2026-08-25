@@ -46,7 +46,7 @@ export function AppThemeProvider({
   const systemColorScheme = useColorScheme()
 
   const [themeMode, setThemeModeState] =
-    useState<ThemeMode>("system")
+    useState<ThemeMode>("light")
   const [isThemeLoading, setIsThemeLoading] =
     useState(true)
 

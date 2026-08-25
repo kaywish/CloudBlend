@@ -12,7 +12,9 @@ import { Platform } from "react-native"
 import type {
   CustomerInfo,
   PurchasesPackage,
+
 } from "react-native-purchases"
+import Purchases from "react-native-purchases"
 
 import { useAuth } from "@/context/AuthContext"
 import {
@@ -129,6 +131,26 @@ export function ProProvider({
     loadCurrentPackage,
     user,
   ])
+
+  useEffect(() => {
+  if (Platform.OS === "web") {
+    return
+  }
+
+  const listener = (info: CustomerInfo) => {
+    applyCustomerInfo(info)
+  }
+
+  Purchases.addCustomerInfoUpdateListener(
+    listener
+  )
+
+  return () => {
+    Purchases.removeCustomerInfoUpdateListener(
+      listener
+    )
+  }
+}, [applyCustomerInfo])
 
   useEffect(() => {
     if (isLoadingAuth) {
