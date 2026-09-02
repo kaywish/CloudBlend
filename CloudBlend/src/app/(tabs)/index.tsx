@@ -31,9 +31,7 @@ type CategoryOption = {
   icon: keyof typeof Ionicons.glyphMap
 }
 
-type QuizLeafPreference = "Any" | "Blonde" | "Dark"
-
-type QuizStage = "category" | "leaf" | "results"
+type QuizStage = "category" | "results"
 
 const categories: CategoryOption[] = [
   {
@@ -190,64 +188,21 @@ useFocusEffect(
 
   function selectQuizCategory(category: string) {
     setSelectedQuizCategory(category)
-    setQuizStage("leaf")
-  }
 
-  function completeQuiz(
-    leafPreference: QuizLeafPreference
-  ) {
     const scoredFlavors = databaseFlavors
       .map((flavor) => {
         let score = 0
+        const flavorCategoryList = getFlavorCategories(flavor)
+        const matchesCategory = flavorCategoryList.some(
+          (item) => item.toLowerCase() === category.toLowerCase()
+        )
 
-        const flavorCategoryList =
-          getFlavorCategories(flavor)
+        if (matchesCategory) score += 60
+        score += Math.min(flavor.averageRating ?? 0, 5) * 4
+        score += Math.min(flavor.favoriteCount ?? 0, 100) * 0.15
+        score += Math.min(flavor.publicMixCount ?? 0, 100) * 0.2
 
-        const matchesCategory =
-          flavorCategoryList.some(
-            (category) =>
-              category.toLowerCase() ===
-              selectedQuizCategory.toLowerCase()
-          )
-
-        if (matchesCategory) {
-          score += 60
-        }
-
-        if (
-          leafPreference === "Dark" &&
-          flavor.isDarkLeaf
-        ) {
-          score += 25
-        }
-
-        if (
-          leafPreference === "Blonde" &&
-          !flavor.isDarkLeaf
-        ) {
-          score += 25
-        }
-
-        if (leafPreference === "Any") {
-          score += 12
-        }
-
-        score +=
-          Math.min(flavor.averageRating ?? 0, 5) * 4
-
-        score +=
-          Math.min(flavor.favoriteCount ?? 0, 100) *
-          0.15
-
-        score +=
-          Math.min(flavor.publicMixCount ?? 0, 100) *
-          0.2
-
-        return {
-          flavor,
-          score,
-          matchesCategory,
-        }
+        return { flavor, score, matchesCategory }
       })
       .filter((item) => item.matchesCategory)
       .sort((first, second) => second.score - first.score)
@@ -408,7 +363,7 @@ useFocusEffect(
 
         <SectionHeader
           eyebrow="COMMUNITY PICKS"
-          title="Trending Mixes"
+          title="Trending Combinations"
           onPress={() => router.push("/explore")}
           theme={theme}
           styles={styles}
@@ -429,7 +384,7 @@ useFocusEffect(
             ListEmptyComponent={
               <EmptyHorizontalCard
                 icon="flask-outline"
-                text="No public mixes yet."
+                text="No public combinations yet."
                 theme={theme}
                 styles={styles}
               />
@@ -516,7 +471,7 @@ useFocusEffect(
                     <Text
                       style={styles.cardActionText}
                     >
-                      View mix
+                      View combination
                     </Text>
 
                     <View style={styles.cardArrow}>
@@ -618,12 +573,6 @@ useFocusEffect(
                   {item.name}
                 </Text>
 
-                <Text
-                  style={styles.flavorBrand}
-                  numberOfLines={1}
-                >
-                  {item.brandName}
-                </Text>
 
                 <View style={styles.flavorTagRow}>
                   {getFlavorCategories(item)
@@ -669,12 +618,11 @@ useFocusEffect(
             </Text>
 
             <Text style={styles.builderTitle}>
-              Build your own mix
+              Create a flavor combination
             </Text>
 
             <Text style={styles.builderText}>
-              Choose flavors and balance your
-              percentages.
+              Choose flavors you enjoy together and save the pairing.
             </Text>
           </View>
 
@@ -735,7 +683,7 @@ useFocusEffect(
                 />
 
                 <Text style={styles.quizStepText}>
-                  QUESTION 1 OF 2
+                  FLAVOR MATCH
                 </Text>
 
                 <Text style={styles.quizQuestion}>
@@ -763,82 +711,6 @@ useFocusEffect(
                     />
                   ))}
                 </View>
-              </>
-            ) : null}
-
-            {quizStage === "leaf" ? (
-              <>
-                <QuizProgress
-                  currentStep={2}
-                  styles={styles}
-                />
-
-                <Text style={styles.quizStepText}>
-                  QUESTION 2 OF 2
-                </Text>
-
-                <Text style={styles.quizQuestion}>
-                  Which leaf type do you prefer?
-                </Text>
-
-                <Text style={styles.quizSubtitle}>
-                  This helps us narrow down your best
-                  flavor matches.
-                </Text>
-
-                <View style={styles.quizOptions}>
-                  <QuizOption
-                    label="No preference"
-                    subtitle="Show both blonde and dark leaf"
-                    icon="options-outline"
-                    onPress={() =>
-                      completeQuiz("Any")
-                    }
-                    theme={theme}
-                    styles={styles}
-                  />
-
-                  <QuizOption
-                    label="Blonde leaf"
-                    subtitle="Usually lighter and smoother"
-                    icon="sunny-outline"
-                    onPress={() =>
-                      completeQuiz("Blonde")
-                    }
-                    theme={theme}
-                    styles={styles}
-                  />
-
-                  <QuizOption
-                    label="Dark leaf"
-                    subtitle="Usually richer and stronger"
-                    icon="moon-outline"
-                    onPress={() =>
-                      completeQuiz("Dark")
-                    }
-                    theme={theme}
-                    styles={styles}
-                  />
-                </View>
-
-                <TouchableOpacity
-                  style={styles.quizBackButton}
-                  onPress={() =>
-                    setQuizStage("category")
-                  }
-                >
-                  <Ionicons
-                    name="arrow-back"
-                    size={17}
-                    color={theme.primary}
-                  />
-
-                  <Text
-                    style={styles.quizBackText}
-                  >
-                    Previous question
-                  </Text>
-                </TouchableOpacity>
               </>
             ) : null}
 
@@ -925,14 +797,6 @@ useFocusEffect(
                               {flavor.name}
                             </Text>
 
-                            <Text
-                              style={
-                                styles.resultBrand
-                              }
-                              numberOfLines={1}
-                            >
-                              {flavor.brandName}
-                            </Text>
 
                             <View
                               style={

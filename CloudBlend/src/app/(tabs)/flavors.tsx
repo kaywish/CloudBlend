@@ -164,9 +164,6 @@ useEffect(() => {
         flavor.name
           .toLowerCase()
           .includes(normalizedSearch) ||
-        flavor.brandName
-          .toLowerCase()
-          .includes(normalizedSearch) ||
         flavor.category
           ?.toLowerCase()
           .includes(normalizedSearch) ||
@@ -214,7 +211,7 @@ useEffect(() => {
           </Text>
 
           <Text style={styles.loadingText}>
-            Getting the latest flavors and brands.
+            Getting the latest flavor profiles.
           </Text>
         </View>
       </SafeAreaView>
@@ -315,8 +312,7 @@ useEffect(() => {
               </Text>
 
               <Text style={styles.heroSubtitle}>
-                Browse the KloudIt library and find
-                the perfect combination for your next mix.
+                Browse the KloudIt library to explore flavor profiles, categories, and community favorites.
               </Text>
             </View>
 
@@ -334,7 +330,7 @@ useEffect(() => {
                   value={search}
                   onChangeText={setSearch}
                   style={styles.searchInput}
-                  placeholder="Search flavors or brands"
+                  placeholder="Search flavors"
                   placeholderTextColor={theme.muted}
                   autoCapitalize="none"
                   autoCorrect={false}
@@ -529,22 +525,6 @@ function FlavorCard({
               {flavor.name}
             </Text>
 
-            <View style={styles.brandRow}>
-              {flavor.brandLogoUrl ? (
-                <Image
-                  source={{ uri: flavor.brandLogoUrl }}
-                  style={styles.brandLogo}
-                  resizeMode="contain"
-                />
-              ) : null}
-
-              <Text
-                style={styles.flavorBrand}
-                numberOfLines={1}
-              >
-                {flavor.brandName}
-              </Text>
-            </View>
           </View>
 
           <View style={styles.chevronButton}>
@@ -565,21 +545,9 @@ function FlavorCard({
             </View>
           ) : null}
 
-          {flavor.strength ? (
-            <View style={styles.categoryTag}>
-              <Text style={styles.categoryTagText}>
-                {formatStrength(flavor.strength)}
-              </Text>
-            </View>
-          ) : null}
 
-          {flavor.isDarkLeaf ? (
-            <View style={styles.categoryTag}>
-              <Text style={styles.categoryTagText}>
-                Dark leaf
-              </Text>
-            </View>
-          ) : null}
+
+
         </View>
 
         <View style={styles.cardFooter}>
@@ -599,14 +567,6 @@ function FlavorCard({
   )
 }
 
-function formatStrength(
-  strength: "light" | "medium" | "strong"
-) {
-  return (
-    strength.charAt(0).toUpperCase() +
-    strength.slice(1)
-  )
-}
 function getStyles(theme: AppTheme) {
   return StyleSheet.create({
     safeArea: {

@@ -99,7 +99,6 @@ const { followingIds } = useFollow()
 
   const {
     topFlavors,
-    topBrands,
     isLoading: isLoadingFlavors,
     refreshFlavors,
   } = useFlavors()
@@ -146,9 +145,6 @@ const { followingIds } = useFollow()
           (ingredient) =>
             ingredient.flavorName
               .toLowerCase()
-              .includes(normalizedSearch) ||
-            ingredient.brand
-              ?.toLowerCase()
               .includes(normalizedSearch)
         )
 
@@ -262,7 +258,7 @@ const { followingIds } = useFollow()
           />
 
           <Text style={styles.loadingTitle}>
-            Discovering mixes
+            Discovering combinations
           </Text>
 
           <Text style={styles.loadingText}>
@@ -330,7 +326,7 @@ const { followingIds } = useFollow()
 
               <Text style={styles.heroSubtitle}>
                 Find new flavor combinations shared by
-                hookah enthusiasts.
+                flavor enthusiasts.
               </Text>
 
               <View style={styles.statsRow}>
@@ -340,7 +336,7 @@ const { followingIds } = useFollow()
                   </Text>
 
                   <Text style={styles.statLabel}>
-                    Public mixes
+                    Public combinations
                   </Text>
                 </View>
 
@@ -369,7 +365,7 @@ const { followingIds } = useFollow()
                 style={styles.searchInput}
                 value={searchQuery}
                 onChangeText={setSearchQuery}
-                placeholder="Search mixes, flavors, or creators"
+                placeholder="Search combinations, flavors, or creators"
                 placeholderTextColor={theme.textSecondary}
                 returnKeyType="search"
               />
@@ -460,12 +456,6 @@ const { followingIds } = useFollow()
                         {item.name}
                       </Text>
 
-                      <Text
-                        style={styles.flavorBrand}
-                        numberOfLines={1}
-                      >
-                        {item.brandName}
-                      </Text>
 
                       <View style={styles.flavorStatsRow}>
                         <Ionicons
@@ -492,106 +482,10 @@ const { followingIds } = useFollow()
               )}
             </View>
 
-            <View style={styles.discoverySection}>
-              <View style={styles.discoveryHeader}>
-                <View style={styles.discoveryHeaderText}>
-                  <Text style={styles.discoveryEyebrow}>
-                    BROWSE BY MAKER
-                  </Text>
-
-                  <Text style={styles.discoveryTitle}>
-                    Popular Brands
-                  </Text>
-
-                  <Text style={styles.discoverySubtitle}>
-                    Explore the flavor catalog by brand.
-                  </Text>
-                </View>
-
-                <View style={styles.discoveryIcon}>
-                  <Ionicons
-                    name="business-outline"
-                    size={19}
-                    color={theme.primary}
-                  />
-                </View>
-              </View>
-
-              {isLoadingFlavors && topBrands.length === 0 ? (
-                <View style={styles.discoveryLoading}>
-                  <ActivityIndicator
-                    size="small"
-                    color={theme.primary}
-                  />
-                </View>
-              ) : (
-                <FlatList
-                  horizontal
-                  data={topBrands}
-                  keyExtractor={(item) => item.id}
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.horizontalListContent}
-                  renderItem={({ item }) => (
-                    <TouchableOpacity
-                      style={styles.brandCard}
-                      activeOpacity={0.85}
-                      onPress={() =>
-                        router.push({
-                          pathname: "/brand/[id]",
-                          params: { id: item.id },
-                        })
-                      }
-                    >
-                      <View style={styles.brandLogoContainer}>
-                        {item.logoUrl ? (
-                          <Image
-                            source={{ uri: item.logoUrl }}
-                            style={styles.brandLogo}
-                          />
-                        ) : (
-                          <Text style={styles.brandInitial}>
-                            {item.name.charAt(0).toUpperCase()}
-                          </Text>
-                        )}
-                      </View>
-
-                      <Text
-                        style={styles.brandName}
-                        numberOfLines={1}
-                      >
-                        {item.name}
-                      </Text>
-
-                      <Text style={styles.brandFlavorCount}>
-                        {item.flavorCount}{" "}
-                        {item.flavorCount === 1
-                          ? "flavor"
-                          : "flavors"}
-                      </Text>
-
-                      <View style={styles.brandRatingRow}>
-                        <Ionicons
-                          name="star"
-                          size={12}
-                          color="#F4B740"
-                        />
-
-                        <Text style={styles.brandRatingText}>
-                          {item.ratingCount > 0
-                            ? item.averageRating.toFixed(1)
-                            : "New"}
-                        </Text>
-                      </View>
-                    </TouchableOpacity>
-                  )}
-                />
-              )}
-            </View>
-
             <View style={styles.sectionHeader}>
               <View>
                 <Text style={styles.sectionTitle}>
-                  Community Mixes
+                  Community Combinations
                 </Text>
 
                 <Text style={styles.resultCount}>
@@ -678,20 +572,20 @@ const { followingIds } = useFollow()
 
     <Text style={styles.emptyTitle}>
       {searchQuery
-        ? "No matching mixes"
+        ? "No matching combinations"
         : sortOption === "following"
           ? "Nothing from people you follow"
-          : "No public mixes yet"}
+          : "No public combinations yet"}
     </Text>
 
     <Text style={styles.emptyText}>
       {searchQuery
-        ? "Try searching for a different mix, creator, flavor, or brand."
+        ? "Try searching for a different combination, creator, or flavor."
         : sortOption === "following"
           ? followingIds.length === 0
-            ? "Follow creators from Explore to see their public mixes here."
-            : "The creators you follow haven't published any public mixes yet."
-          : "Publish one of your mixes to help start the KloudIt community."}
+            ? "Follow creators from Explore to see their public combinations here."
+            : "The creators you follow haven't published any public combinations yet."
+          : "Publish one of your combinations to help start the KloudIt community."}
     </Text>
 
     {searchQuery ? (
@@ -707,23 +601,10 @@ const { followingIds } = useFollow()
   </View>
 }
         renderItem={({ item, index }) => {
-          const totalPercentage =
-            item.ingredients.reduce(
-              (total, ingredient) =>
-                total + ingredient.percentage,
-              0
-            )
-
           const isUpdatingLike =
             updatingLikeIds.includes(item.id)
 
-          const topIngredients = item.ingredients
-            .slice()
-            .sort(
-              (a, b) =>
-                b.percentage - a.percentage
-            )
-            .slice(0, 3)
+          const topIngredients = item.ingredients.slice(0, 3)
 
           const creatorUsername =
             item.creatorUsername?.trim() || "KloudIt user"
@@ -769,7 +650,7 @@ const { followingIds } = useFollow()
 
   <View style={styles.creatorInfo}>
     <Text style={styles.creatorLabel}>
-      MIXED BY
+      CREATED BY
     </Text>
 
     <Text
@@ -823,11 +704,6 @@ const { followingIds } = useFollow()
                       {item.ingredients.length} flavors
                     </Text>
 
-                    <View style={styles.metaDot} />
-
-                    <Text style={styles.mixMeta}>
-                      {totalPercentage}%
-                    </Text>
                   </View>
                 </View>
 
@@ -864,32 +740,9 @@ const { followingIds } = useFollow()
                     style={styles.ingredientRow}
                   >
                     <View style={styles.ingredientTitleRow}>
-                      <Text
-                        style={styles.ingredientName}
-                        numberOfLines={1}
-                      >
+                      <Text style={styles.ingredientName} numberOfLines={1}>
                         {ingredient.flavorName}
                       </Text>
-
-                      <Text
-                        style={styles.ingredientPercentage}
-                      >
-                        {ingredient.percentage}%
-                      </Text>
-                    </View>
-
-                    <View style={styles.progressTrack}>
-                      <View
-                        style={[
-                          styles.progressFill,
-                          {
-                            width: `${Math.min(
-                              ingredient.percentage,
-                              100
-                            )}%`,
-                          },
-                        ]}
-                      />
                     </View>
                   </View>
                 ))}
@@ -989,7 +842,7 @@ const { followingIds } = useFollow()
 
                   <View style={styles.openMixHint}>
                     <Text style={styles.openMixHintText}>
-                      View Mix
+                      View Combination
                     </Text>
 
                     <Ionicons
@@ -1032,7 +885,7 @@ const { followingIds } = useFollow()
 >
       <View style={styles.sortModalHeader}>
         <Text style={styles.sortModalTitle}>
-          Sort Community Mixes
+          Sort Community Combinations
         </Text>
       </View>
 

@@ -491,7 +491,7 @@ async function handleToggleFollow() {
               <Text
                 style={styles.headerTitle}
               >
-                Creator Profile
+                Community Profile
               </Text>
 
               {isMyProfile ? (
@@ -665,7 +665,7 @@ async function handleToggleFollow() {
 
             <View style={styles.statsRow}>
   <StatCard
-    icon="flask-outline"
+    icon="sparkles-outline"
     value={userMixes.length}
     label="Published"
     theme={theme}
@@ -710,7 +710,7 @@ async function handleToggleFollow() {
                     styles.sectionEyebrow
                   }
                 >
-                  COMMUNITY CREATIONS
+                  COMMUNITY COLLECTION
                 </Text>
 
                 <Text
@@ -718,7 +718,7 @@ async function handleToggleFollow() {
                     styles.sectionTitle
                   }
                 >
-                  Public Mixes
+                  Public Combinations
                 </Text>
               </View>
 
@@ -752,7 +752,7 @@ async function handleToggleFollow() {
           >
             <View style={styles.emptyIcon}>
               <Ionicons
-                name="flask-outline"
+                name="sparkles-outline"
                 size={34}
                 color={theme.primary}
               />
@@ -761,14 +761,14 @@ async function handleToggleFollow() {
             <Text
               style={styles.noMixesTitle}
             >
-              No public mixes yet
+              No public combinations yet
             </Text>
 
             <Text
               style={styles.noMixesText}
             >
-              @{profile.username} hasn't
-              published a mix to the KloudIt
+              @{profile.username} hasn't shared a
+              flavor combination with the KloudIt
               community yet.
             </Text>
           </View>
@@ -786,7 +786,7 @@ function StatCard({
   styles,
 }: {
   icon:
-   | "flask-outline"
+   | "sparkles-outline"
   | "heart-outline"
   | "star-outline"
   | "people-outline"
@@ -829,14 +829,7 @@ function PublicMixCard({
   styles: ReturnType<typeof getStyles>
 }) {
   const topIngredients =
-    mix.ingredients
-      .slice()
-      .sort(
-        (a, b) =>
-          b.percentage -
-          a.percentage
-      )
-      .slice(0, 3)
+    mix.ingredients.slice(0, 3)
 
   return (
     <TouchableOpacity
@@ -849,7 +842,7 @@ function PublicMixCard({
       <View style={styles.mixHeader}>
         <View style={styles.mixIcon}>
           <Ionicons
-            name="flask"
+            name="sparkles"
             size={21}
             color="#FFFFFF"
           />
@@ -894,14 +887,6 @@ function PublicMixCard({
                 numberOfLines={1}
               >
                 {ingredient.flavorName}
-              </Text>
-
-              <Text
-                style={
-                  styles.ingredientPercentage
-                }
-              >
-                {ingredient.percentage}%
               </Text>
             </View>
           )
@@ -953,7 +938,7 @@ function PublicMixCard({
           <Text
             style={styles.viewHintText}
           >
-            View Mix
+            View Combination
           </Text>
 
           <Ionicons
@@ -1259,12 +1244,6 @@ statCard: {
       fontSize: 12,
       fontWeight: "700",
       color: theme.text,
-    },
-
-    ingredientPercentage: {
-      fontSize: 11,
-      fontWeight: "900",
-      color: theme.primary,
     },
 
     mixFooter: {

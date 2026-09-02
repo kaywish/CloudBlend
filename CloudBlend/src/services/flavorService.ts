@@ -38,8 +38,6 @@ type FlavorStatisticsRow = {
   description: string | null
   image_url: string | null
   category: string | null
-  strength: "light" | "medium" | "strong" | null
-  is_dark_leaf: boolean
 
   average_rating: number | string | null
   rating_count: number | string | null
@@ -65,7 +63,9 @@ type FlavorRatingRow = {
     | null
 }
 
-function toNumber(value: number | string | null | undefined): number {
+function toNumber(
+  value: number | string | null | undefined
+): number {
   const parsed = Number(value ?? 0)
 
   return Number.isFinite(parsed) ? parsed : 0
@@ -111,31 +111,19 @@ function mapFlavorStatisticsRow(
     description: row.description,
     imageUrl: row.image_url,
     category: row.category,
-    strength: row.strength,
-    isDarkLeaf: row.is_dark_leaf,
+
+    // Keep these legacy properties neutral for compatibility with
+    // the existing Flavor type while no longer loading them from
+    // the catalog statistics view.
+    strength: null,
+    isDarkLeaf: false,
+
     isActive: true,
 
     averageRating: toNumber(row.average_rating),
     ratingCount: toNumber(row.rating_count),
     favoriteCount: toNumber(row.favorite_count),
     publicMixCount: toNumber(row.public_mix_count),
-  }
-}
-
-function mapFlavorRatingRow(
-  row: FlavorRatingRow
-): FlavorRating {
-  return {
-    id: row.id,
-    flavorId: row.flavor_id,
-    userId: row.user_id,
-    rating: toNumber(row.rating),
-    review: row.review,
-    username: row.profiles?.username ?? null,
-    displayName: row.profiles?.display_name ?? null,
-    avatarUrl: row.profiles?.avatar_url ?? null,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
   }
 }
 
@@ -183,10 +171,29 @@ export async function fetchBrandStatistics(): Promise<
   )
 }
 
-export async function fetchFlavorStatistics(): Promise<Flavor[]> {
+export async function fetchFlavorStatistics(): Promise<
+  Flavor[]
+> {
   const { data, error } = await supabase
     .from("flavor_statistics")
-    .select("*")
+    .select(
+      `
+        id,
+        brand_id,
+        brand_name,
+        brand_slug,
+        brand_logo_url,
+        name,
+        slug,
+        description,
+        image_url,
+        category,
+        average_rating,
+        rating_count,
+        favorite_count,
+        public_mix_count
+      `
+    )
     .order("name", { ascending: true })
 
   if (error) {
@@ -203,7 +210,24 @@ export async function fetchFlavorById(
 ): Promise<Flavor | null> {
   const { data, error } = await supabase
     .from("flavor_statistics")
-    .select("*")
+    .select(
+      `
+        id,
+        brand_id,
+        brand_name,
+        brand_slug,
+        brand_logo_url,
+        name,
+        slug,
+        description,
+        image_url,
+        category,
+        average_rating,
+        rating_count,
+        favorite_count,
+        public_mix_count
+      `
+    )
     .eq("id", flavorId)
     .maybeSingle()
 
@@ -250,6 +274,23 @@ export async function fetchFlavorRatings(
   return ((data ?? []) as FlavorRatingRow[]).map(
     mapFlavorRatingRow
   )
+}
+
+function mapFlavorRatingRow(
+  row: FlavorRatingRow
+): FlavorRating {
+  return {
+    id: row.id,
+    flavorId: row.flavor_id,
+    userId: row.user_id,
+    rating: toNumber(row.rating),
+    review: row.review,
+    username: row.profiles?.username ?? null,
+    displayName: row.profiles?.display_name ?? null,
+    avatarUrl: row.profiles?.avatar_url ?? null,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }
 }
 
 export async function saveFlavorRating(

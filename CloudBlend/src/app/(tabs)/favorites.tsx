@@ -71,8 +71,8 @@ export default function FavoritesScreen() {
       items.push({
         type: "section",
         id: "personal-section",
-        title: "My Mixes",
-        eyebrow: "YOUR CREATIONS",
+        title: "My Combinations",
+        eyebrow: "YOUR COLLECTIONS",
         count: personalMixes.length,
       })
 
@@ -124,8 +124,8 @@ export default function FavoritesScreen() {
 
     Alert.alert(
       isCommunityMix
-        ? "Remove Saved Mix"
-        : "Delete Mix",
+        ? "Remove Saved Combination"
+        : "Delete Combination",
       isCommunityMix
         ? `Remove "${mix.name}" from your community collection?`
         : `Are you sure you want to delete "${mix.name}"?`,
@@ -144,14 +144,14 @@ export default function FavoritesScreen() {
               await deleteMix(mix.id)
             } catch (error) {
               console.error(
-                "Could not delete mix:",
+                "Could not delete combination:",
                 error
               )
 
               Alert.alert(
                 isCommunityMix
-                  ? "Could Not Remove Mix"
-                  : "Could Not Delete Mix",
+                  ? "Could Not Remove Combination"
+                  : "Could Not Delete Combination",
                 "Something went wrong. Please try again."
               )
             }
@@ -170,7 +170,7 @@ export default function FavoritesScreen() {
         <View style={styles.loadingContainer}>
           <View style={styles.loadingIcon}>
             <Ionicons
-              name="flask"
+              name="sparkles"
               size={26}
               color="#FFFFFF"
             />
@@ -183,11 +183,11 @@ export default function FavoritesScreen() {
           />
 
           <Text style={styles.loadingTitle}>
-            Loading your mixes
+            Loading your combinations
           </Text>
 
           <Text style={styles.loadingText}>
-            Getting your saved KloudIt recipes
+            Getting your saved flavor combinations
             ready...
           </Text>
         </View>
@@ -225,7 +225,7 @@ export default function FavoritesScreen() {
 
               <View style={styles.heroCountBadge}>
                 <Ionicons
-                  name="flask-outline"
+                  name="sparkles-outline"
                   size={14}
                   color="#FFFFFF"
                 />
@@ -233,8 +233,8 @@ export default function FavoritesScreen() {
                 <Text style={styles.heroCountText}>
                   {savedMixes.length}{" "}
                   {savedMixes.length === 1
-                    ? "mix"
-                    : "mixes"}
+                    ? "combination"
+                    : "combinations"}
                 </Text>
               </View>
             </View>
@@ -244,8 +244,8 @@ export default function FavoritesScreen() {
             </Text>
 
             <Text style={styles.heroSubtitle}>
-              Keep your personal creations and
-              favorite community recipes together in
+              Keep your personal flavor combinations
+              and saved community favorites together in
               one place.
             </Text>
 
@@ -290,7 +290,7 @@ export default function FavoritesScreen() {
                   styles.heroCreateButtonText
                 }
               >
-                Create a new mix
+                Create a new combination
               </Text>
             </TouchableOpacity>
           </View>
@@ -326,19 +326,19 @@ export default function FavoritesScreen() {
           <View style={styles.emptyContainer}>
             <View style={styles.emptyIcon}>
               <Ionicons
-                name="flask-outline"
+                name="sparkles-outline"
                 size={40}
                 color={theme.primary}
               />
             </View>
 
             <Text style={styles.emptyTitle}>
-              Your mix library is empty
+              Your flavor library is empty
             </Text>
 
             <Text style={styles.emptyText}>
-              Create your first blend or save a
-              community recipe with KloudIt Pro.
+              Create your first flavor combination or
+              save a community favorite with KloudIt Pro.
             </Text>
 
             <TouchableOpacity
@@ -356,7 +356,7 @@ export default function FavoritesScreen() {
               <Text
                 style={styles.createButtonText}
               >
-                Build your first mix
+                Create your first combination
               </Text>
             </TouchableOpacity>
           </View>
@@ -425,12 +425,6 @@ function SavedMixCard({
     year: "numeric",
   })
 
-  const totalPercentage =
-    mix.ingredients.reduce(
-      (total, ingredient) =>
-        total + ingredient.percentage,
-      0
-    )
 
   return (
     <TouchableOpacity
@@ -462,7 +456,7 @@ function SavedMixCard({
             name={
               isCommunity
                 ? "people"
-                : "flask"
+                : "sparkles"
             }
             size={22}
             color="#FFFFFF"
@@ -562,62 +556,34 @@ function SavedMixCard({
 
       <View style={styles.blendSummary}>
         <View>
-          <Text
-            style={styles.blendSummaryLabel}
-          >
-            BLEND TOTAL
+          <Text style={styles.blendSummaryLabel}>
+            FLAVOR COMBINATION
           </Text>
 
-          <Text
-            style={styles.blendSummaryValue}
-          >
-            {totalPercentage}%
+          <Text style={styles.blendSummaryValue}>
+            {mix.ingredients.length}{" "}
+            {mix.ingredients.length === 1
+              ? "flavor"
+              : "flavors"}
           </Text>
         </View>
 
         <View style={styles.readyBadge}>
           <Ionicons
-            name={
-              totalPercentage === 100
-                ? "checkmark-circle"
-                : "alert-circle"
-            }
+            name="sparkles-outline"
             size={15}
-            color={
-              totalPercentage === 100
-                ? theme.success
-                : theme.warning
-            }
+            color={theme.primary}
           />
 
           <Text
             style={[
               styles.readyBadgeText,
-              totalPercentage !== 100 &&
-                styles.readyBadgeTextWarning,
+              { color: theme.primary },
             ]}
           >
-            {totalPercentage === 100
-              ? "Balanced"
-              : "Review mix"}
+            Saved
           </Text>
         </View>
-      </View>
-
-      <View style={styles.progressTrack}>
-        <View
-          style={[
-            styles.progressFill,
-            {
-              width: `${Math.min(
-                totalPercentage,
-                100
-              )}%`,
-            },
-            totalPercentage !== 100 &&
-              styles.progressFillWarning,
-          ]}
-        />
       </View>
 
       <View style={styles.ingredientList}>
@@ -646,7 +612,7 @@ function SavedMixCard({
                     }
                   >
                     <Ionicons
-                      name="leaf-outline"
+                      name="color-palette-outline"
                       size={17}
                       color={theme.primary}
                     />
@@ -666,32 +632,7 @@ function SavedMixCard({
                   >
                     {ingredient.flavorName}
                   </Text>
-
-                  {ingredient.brand ? (
-                    <Text
-                      style={
-                        styles.ingredientBrand
-                      }
-                      numberOfLines={1}
-                    >
-                      {ingredient.brand}
-                    </Text>
-                  ) : null}
                 </View>
-              </View>
-
-              <View
-                style={
-                  styles.percentageBadge
-                }
-              >
-                <Text
-                  style={
-                    styles.percentageText
-                  }
-                >
-                  {ingredient.percentage}%
-                </Text>
               </View>
             </View>
           )
@@ -717,7 +658,7 @@ function SavedMixCard({
 
       <View style={styles.cardFooter}>
         <Text style={styles.viewText}>
-          Open recipe
+          View combination
         </Text>
 
         <View style={styles.arrowButton}>

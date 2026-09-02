@@ -26,39 +26,39 @@ import { usePro } from "@/context/ProContext"
 const PRO_FEATURES = [
   {
     icon: "bookmark-outline" as const,
-    title: "Save Community Mixes",
+    title: "Save Community Combinations",
     description:
-      "Save public recipes to your personal mix library.",
+      "Save public flavor combinations to your personal library.",
   },
   {
     icon: "infinite-outline" as const,
-    title: "Unlimited Personal Mixes",
+    title: "Unlimited Personal Combinations",
     description:
-      "Create and organize as many recipes as you want.",
+      "Create and organize as many flavor combinations as you want.",
   },
   {
     icon: "analytics-outline" as const,
-    title: "Personal Mix Statistics",
+    title: "Personal Flavor Statistics",
     description:
-      "Discover your most-used flavors, brands, and categories.",
+      "Discover your most-used flavors and favorite categories.",
   },
   {
     icon: "library-outline" as const,
     title: "Collections",
     description:
-      "Organize recipes into collections such as favorites, summer mixes, and mint blends.",
+      "Organize your saved combinations into custom collections.",
   },
   {
     icon: "journal-outline" as const,
     title: "Flavor Journal",
     description:
-      "Track bowl notes, heat setup, ratings, and smoking sessions.",
+      "Keep notes, ratings, and personal impressions for flavors you explore.",
   },
   {
     icon: "git-compare-outline" as const,
-    title: "Advanced Pairings",
+    title: "Advanced Discovery",
     description:
-      "Unlock pairing details and recommended flavor ratios.",
+      "Explore deeper flavor relationships and community favorites.",
   },
 ]
 
@@ -223,13 +223,13 @@ async function handleRestore() {
           </Text>
 
           <Text style={styles.heroTitle}>
-            Blend without limits
+            Explore without limits
           </Text>
 
           <Text style={styles.heroText}>
-            Save community recipes, organize your
-            collection, and unlock advanced tools built
-            for hookah enthusiasts.
+            Save community combinations, organize your
+            collection, and unlock advanced tools for
+            exploring flavors.
           </Text>
 
           {hasPro ? (
@@ -253,7 +253,7 @@ async function handleRestore() {
           </Text>
 
           <Text style={styles.sectionTitle}>
-            Everything you need to build better mixes
+            Everything you need to explore more flavors
           </Text>
 
           <View style={styles.featureCard}>

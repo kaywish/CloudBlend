@@ -541,18 +541,6 @@ export default function FlavorDetailScreen() {
               {flavor.name}
             </Text>
 
-            <TouchableOpacity
-              onPress={() =>
-                router.push({
-                  pathname: "/brand/[id]",
-                  params: { id: flavor.brandId },
-                })
-              }
-            >
-              <Text style={styles.brandName}>
-                {flavor.brandName}
-              </Text>
-            </TouchableOpacity>
           </View>
         </View>
 
@@ -744,7 +732,7 @@ export default function FlavorDetailScreen() {
                 COMMUNITY CREATIONS
               </Text>
               <Text style={styles.sectionTitle}>
-                Mixes using this flavor
+                Combinations featuring this flavor
               </Text>
             </View>
 
@@ -764,7 +752,7 @@ export default function FlavorDetailScreen() {
             <View style={styles.mixesLoading}>
               <ActivityIndicator color={theme.primary} />
               <Text style={styles.mixesLoadingText}>
-                Loading community mixes...
+                Loading community combinations...
               </Text>
             </View>
           ) : communityMixes.length === 0 ? (
@@ -778,12 +766,11 @@ export default function FlavorDetailScreen() {
               </View>
 
               <Text style={styles.noMixesTitle}>
-                No public mixes yet
+                No community combinations yet
               </Text>
 
               <Text style={styles.noMixesText}>
-                Create a mix with {flavor.name} and publish it
-                to the community.
+                Pair {flavor.name} with other flavors and share the combination with the community.
               </Text>
 
               <TouchableOpacity
@@ -803,7 +790,7 @@ export default function FlavorDetailScreen() {
                   color={theme.primary}
                 />
                 <Text style={styles.outlineButtonText}>
-                  Create a mix
+                  Create a combination
                 </Text>
               </TouchableOpacity>
             </View>
@@ -915,7 +902,7 @@ export default function FlavorDetailScreen() {
                   Submit a flavor photo
                 </Text>
                 <Text style={styles.modalSubtitle}>
-                  {flavor.name} by {flavor.brandName}
+                  {flavor.name}
                 </Text>
               </View>
 
@@ -1075,7 +1062,7 @@ export default function FlavorDetailScreen() {
                   {myRating ? "Update your rating" : "Rate this flavor"}
                 </Text>
                 <Text style={styles.modalSubtitle}>
-                  {flavor.name} by {flavor.brandName}
+                  {flavor.name}
                 </Text>
               </View>
 
@@ -1218,9 +1205,7 @@ function CommunityMixCard({
           <Text style={styles.communityMixMeta}>
             {mix.ingredients.length}{" "}
             {mix.ingredients.length === 1 ? "flavor" : "flavors"}
-            {highlightedIngredient
-              ? ` • ${highlightedIngredient.percentage}% ${highlightedIngredient.flavorName}`
-              : ""}
+            {highlightedIngredient ? ` • ${highlightedIngredient.flavorName}` : ""}
           </Text>
         </View>
 
@@ -1269,26 +1254,15 @@ function CommunityMixCard({
                 {ingredient.flavorName}
               </Text>
 
-              {ingredient.brand ? (
-                <Text
-                  style={styles.mixIngredientBrand}
-                  numberOfLines={1}
-                >
-                  {ingredient.brand}
-                </Text>
-              ) : null}
             </View>
 
-            <Text style={styles.mixIngredientPercentage}>
-              {ingredient.percentage}%
-            </Text>
           </View>
         ))}
       </View>
 
       <View style={styles.communityMixFooter}>
         <Text style={styles.viewMixText}>
-          View community mix
+          View community combination
         </Text>
 
         <Ionicons

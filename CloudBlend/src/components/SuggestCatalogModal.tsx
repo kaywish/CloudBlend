@@ -7,7 +7,6 @@ import {
   Modal,
   ScrollView,
   StyleSheet,
-  Switch,
   Text,
   TextInput,
   TouchableOpacity,
@@ -18,7 +17,6 @@ import { SafeAreaView } from "react-native-safe-area-context"
 import type { AppTheme } from "@/constants/colors"
 import {
   type CatalogSubmissionImage,
-  type CatalogSubmissionStrength,
   createCatalogSubmission,
   findExistingFlavor,
   findPendingCatalogSubmission
@@ -53,24 +51,6 @@ const CATEGORIES = [
   "Other",
 ]
 
-const STRENGTH_OPTIONS: {
-  label: string
-  value: CatalogSubmissionStrength
-}[] = [
-  {
-    label: "Light",
-    value: "light",
-  },
-  {
-    label: "Medium",
-    value: "medium",
-  },
-  {
-    label: "Strong",
-    value: "strong",
-  },
-]
-
 export default function SuggestCatalogModal({
   visible,
   brands,
@@ -101,11 +81,7 @@ export default function SuggestCatalogModal({
   const [category, setCategory] =
     useState("")
 
-  const [strength, setStrength] =
-    useState<CatalogSubmissionStrength>("medium")
 
-  const [isDarkLeaf, setIsDarkLeaf] =
-    useState(false)
 
   const [description, setDescription] =
     useState("")
@@ -161,8 +137,6 @@ export default function SuggestCatalogModal({
     setNewBrandName("")
     setFlavorName("")
     setCategory("")
-    setStrength("medium")
-    setIsDarkLeaf(false)
     setDescription("")
     setFlavorImage(null)
     setPermissionConfirmed(false)
@@ -219,8 +193,8 @@ async function selectFlavorImage() {
 
   if (!selectedBrandId && !newBrandName.trim()) {
     Alert.alert(
-      "Brand Required",
-      "Select an existing brand or create a new one."
+      "Source Required",
+      "Select an existing source or create a new one."
     )
 
     return
@@ -266,7 +240,7 @@ async function selectFlavorImage() {
       console.log("Flavor already exists!")
     Alert.alert(
       "Flavor Already Exists",
-      `${existingFlavor.brandName} ${existingFlavor.name} is already in the KloudIt catalog. You can select it from the flavor list instead.`
+      `${existingFlavor.name} is already in the KloudIt catalog. You can select it from the flavor list instead.`
     )
 
     return
@@ -295,7 +269,7 @@ if (alreadyPending) {
   console.log("Submission already pending!")
   Alert.alert(
     "Already Submitted",
-    "This brand and flavor have already been submitted and are waiting for review."
+    "This flavor has already been submitted and is waiting for review."
   )
 
   return
@@ -311,8 +285,8 @@ if (alreadyPending) {
         : newBrandName,
       proposedFlavorName: flavorName,
       category,
-      strength,
-      isDarkLeaf,
+      strength: "medium",
+      isDarkLeaf: false,
       description,
       flavorImage,
       permissionConfirmed,
@@ -330,7 +304,7 @@ if (alreadyPending) {
       "Could Not Submit",
       error instanceof Error
         ? error.message
-        : "Something went wrong while submitting the brand and flavor."
+        : "Something went wrong while submitting the flavor."
     )
   } finally {
     setIsSubmitting(false)
@@ -363,7 +337,7 @@ if (alreadyPending) {
 
           <View style={styles.headerContent}>
             <Text style={styles.title}>
-              Suggest Brand & Flavor
+              Suggest a Flavor
             </Text>
 
             <Text style={styles.subtitle}>
@@ -390,9 +364,8 @@ if (alreadyPending) {
             />
 
             <Text style={styles.infoText}>
-              Once approved, this brand and flavor
-              will appear in the KloudIt catalog
-              for everyone.
+              Once approved, this flavor will appear
+              in the KloudIt catalog for everyone.
             </Text>
           </View>
 
@@ -401,7 +374,7 @@ if (alreadyPending) {
 </Text>
 
 <Text style={styles.inputLabel}>
-  Search or add a brand *
+  Source / collection *
 </Text>
 
 {selectedBrand ? (
@@ -420,7 +393,7 @@ if (alreadyPending) {
       </Text>
 
       <Text style={styles.selectedBrandStatus}>
-        Existing brand
+        Existing source
       </Text>
     </View>
 
@@ -453,7 +426,7 @@ if (alreadyPending) {
       </Text>
 
       <Text style={styles.selectedBrandStatus}>
-        New brand — pending approval
+        New source — pending approval
       </Text>
     </View>
 
@@ -483,7 +456,7 @@ if (alreadyPending) {
         value={brandSearch}
         onChangeText={setBrandSearch}
         style={styles.searchInput}
-        placeholder="Search brands..."
+        placeholder="Search sources..."
         placeholderTextColor={theme.muted}
         autoCapitalize="words"
         autoCorrect={false}
@@ -588,7 +561,7 @@ if (alreadyPending) {
         ) ? (
           <View style={styles.emptyBrandList}>
             <Text style={styles.emptyBrandText}>
-              This brand already exists. Select it
+              This source already exists. Select it
               from the results above.
             </Text>
           </View>
@@ -596,7 +569,7 @@ if (alreadyPending) {
       </View>
     ) : (
       <Text style={styles.brandSearchHint}>
-        Search for an existing brand. If it is
+        Search for an existing source. If it is
         missing, you can create it from the search
         results.
       </Text>
@@ -658,72 +631,6 @@ if (alreadyPending) {
           </View>
 
           <Text style={styles.inputLabel}>
-            Strength
-          </Text>
-
-          <View style={styles.strengthRow}>
-            {STRENGTH_OPTIONS.map(
-              (option) => {
-                const isSelected =
-                  strength === option.value
-
-                return (
-                  <TouchableOpacity
-                    key={option.value}
-                    style={[
-                      styles.strengthButton,
-                      isSelected &&
-                        styles.strengthButtonSelected,
-                    ]}
-                    onPress={() =>
-                      setStrength(option.value)
-                    }
-                  >
-                    <Text
-                      style={[
-                        styles.strengthText,
-                        isSelected &&
-                          styles.strengthTextSelected,
-                      ]}
-                    >
-                      {option.label}
-                    </Text>
-                  </TouchableOpacity>
-                )
-              }
-            )}
-          </View>
-
-          <View style={styles.switchCard}>
-            <View style={styles.switchContent}>
-              <Text style={styles.switchTitle}>
-                Dark leaf flavor
-              </Text>
-
-              <Text
-                style={styles.switchSubtitle}
-              >
-                Turn this on if the flavor uses
-                dark leaf tobacco.
-              </Text>
-            </View>
-
-            <Switch
-              value={isDarkLeaf}
-              onValueChange={setIsDarkLeaf}
-              trackColor={{
-                false: theme.divider,
-                true: theme.primaryLight,
-              }}
-              thumbColor={
-                isDarkLeaf
-                  ? theme.primary
-                  : theme.muted
-              }
-            />
-          </View>
-
-          <Text style={styles.inputLabel}>
             Description
           </Text>
 
@@ -752,7 +659,7 @@ if (alreadyPending) {
           <ImageSelector
             image={flavorImage}
             title="Add flavor image"
-            subtitle="Optional product photo"
+            subtitle="Optional flavor image"
             theme={theme}
            onChoose={() =>
   void selectFlavorImage()
@@ -1165,67 +1072,6 @@ function getStyles(theme: AppTheme) {
 
     optionChipTextSelected: {
       color: theme.primaryDark,
-    },
-
-    strengthRow: {
-      flexDirection: "row",
-      gap: 8,
-    },
-
-    strengthButton: {
-      flex: 1,
-      minHeight: 45,
-      alignItems: "center",
-      justifyContent: "center",
-      borderWidth: 1,
-      borderColor: theme.border,
-      borderRadius: 14,
-      backgroundColor: theme.card,
-    },
-
-    strengthButtonSelected: {
-      borderColor: theme.primary,
-      backgroundColor: theme.primaryLight,
-    },
-
-    strengthText: {
-      fontSize: 12,
-      fontWeight: "700",
-      color: theme.muted,
-    },
-
-    strengthTextSelected: {
-      color: theme.primaryDark,
-    },
-
-    switchCard: {
-      minHeight: 76,
-      marginTop: 18,
-      paddingHorizontal: 14,
-      flexDirection: "row",
-      alignItems: "center",
-      borderWidth: 1,
-      borderColor: theme.border,
-      borderRadius: 16,
-      backgroundColor: theme.card,
-    },
-
-    switchContent: {
-      flex: 1,
-      paddingRight: 12,
-    },
-
-    switchTitle: {
-      fontSize: 13,
-      fontWeight: "800",
-      color: theme.text,
-    },
-
-    switchSubtitle: {
-      marginTop: 4,
-      fontSize: 11,
-      lineHeight: 16,
-      color: theme.textSecondary,
     },
 
     imageSelector: {

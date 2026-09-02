@@ -1,5 +1,3 @@
-export type FlavorStrength = "light" | "medium" | "strong"
-
 export type Brand = {
   id: string
   name: string
@@ -20,6 +18,7 @@ export type BrandStatistics = Brand & {
 
 export type Flavor = {
   id: string
+
   brandId: string
   brandName: string
   brandSlug: string | null
@@ -29,21 +28,19 @@ export type Flavor = {
   slug: string
   description: string | null
   imageUrl: string | null
+
   imageSource: string | null
   imageCredit: string | null
   imageLicense: string | null
   imageApproved: boolean
+
   category: string | null
-  strength: FlavorStrength | null
-  isDarkLeaf: boolean
   isActive: boolean
 
   averageRating: number
   ratingCount: number
   favoriteCount: number
   publicMixCount: number
-
-  
 
   createdAt?: string
   updatedAt?: string
@@ -103,20 +100,15 @@ export type AdminFlavorImageSubmission = {
   flavorId: string
   flavorName: string
   brandName: string | null
-
   submittedBy: string
   submitterName: string | null
-
   imageUrl: string
   storagePath: string
-
   creditName: string | null
   notes: string | null
-
   status: "pending" | "approved" | "rejected"
   permissionConfirmed: boolean
   isPrimary: boolean
-
   reviewedBy: string | null
   reviewedAt: string | null
   createdAt: string

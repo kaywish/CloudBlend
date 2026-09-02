@@ -416,8 +416,8 @@ async function handleRestorePurchases() {
 
   function handleDeleteAccount() {
     const message = hasPro
-      ? "This permanently deletes your KloudIt account, profile, mixes, and associated account data. Deleting your KloudIt account does not automatically cancel your App Store subscription. This action cannot be undone."
-      : "This permanently deletes your KloudIt account, profile, mixes, and associated account data. This action cannot be undone."
+      ? "This permanently deletes your KloudIt account, profile, saved combinations, and associated account data. Deleting your KloudIt account does not automatically cancel your App Store subscription. This action cannot be undone."
+      : "This permanently deletes your KloudIt account, profile, saved combinations, and associated account data. This action cannot be undone."
 
     if (Platform.OS === "web") {
       const confirmed = window.confirm(
@@ -477,7 +477,7 @@ async function handleRestorePurchases() {
           </Text>
 
           <Text style={styles.guestSubtitle}>
-            Sign in to create your profile, save mixes,
+            Sign in to create your profile, save flavor combinations,
             publish blends, and connect with the
             KloudIt community.
           </Text>
@@ -494,7 +494,7 @@ async function handleRestorePurchases() {
 
               <View style={styles.guestFeatureContent}>
                 <Text style={styles.guestFeatureTitle}>
-                  Save your mixes
+                  Save your combinations
                 </Text>
 
                 <Text style={styles.guestFeatureText}>
@@ -521,7 +521,7 @@ async function handleRestorePurchases() {
                 </Text>
 
                 <Text style={styles.guestFeatureText}>
-                  Publish your best mixes and let other
+                  Share your favorite combinations and let other
                   users discover them.
                 </Text>
               </View>
@@ -545,7 +545,7 @@ async function handleRestorePurchases() {
 
                 <Text style={styles.guestFeatureText}>
                   Add a username, profile picture, bio,
-                  and public mix collection.
+                  and public flavor collection.
                 </Text>
               </View>
             </View>
@@ -567,7 +567,7 @@ async function handleRestorePurchases() {
           </TouchableOpacity>
 
           <Text style={styles.guestFooter}>
-            You can still browse flavors and public mixes
+            You can still browse flavors and public combinations
             without an account.
           </Text>
         </ScrollView>
@@ -729,7 +729,7 @@ async function handleRestorePurchases() {
               {savedMixes.length}
             </Text>
             <Text style={styles.statLabel}>
-              Total Mixes
+              Saved Combinations
             </Text>
           </View>
 
@@ -779,7 +779,7 @@ async function handleRestorePurchases() {
         <View style={styles.sectionHeader}>
           <View>
             <Text style={styles.sectionTitle}>
-              Your Mixes
+              Your Combinations
             </Text>
             <Text style={styles.sectionSubtitle}>
               Your latest KloudIt creations
@@ -811,7 +811,7 @@ async function handleRestorePurchases() {
               />
             </View>
             <Text style={styles.emptyTitle}>
-              No mixes yet
+              No combinations yet
             </Text>
             <Text style={styles.emptyText}>
               Create your first blend and it will appear
@@ -827,7 +827,7 @@ async function handleRestorePurchases() {
                 color="#FFFFFF"
               />
               <Text style={styles.createButtonText}>
-                Create a Mix
+                Create a Combination
               </Text>
             </TouchableOpacity>
           </View>
@@ -1069,7 +1069,7 @@ async function handleRestorePurchases() {
     </Text>
 
     <Text style={styles.accountValue}>
-      Review new brand and flavor submissions
+      Review new flavor submissions
     </Text>
   </View>
 
@@ -1201,7 +1201,7 @@ async function handleRestorePurchases() {
       <Text style={styles.proDescription}>
         {hasPro
           ? "Your Pro features are active on this account."
-          : "Save community mixes and unlock advanced collection tools."}
+          : "Save community combinations and unlock advanced collection tools."}
       </Text>
     </View>
 

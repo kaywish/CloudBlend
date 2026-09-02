@@ -1,10 +1,6 @@
 import { Ionicons } from "@expo/vector-icons"
-import Slider from "@react-native-community/slider"
 import { router, useLocalSearchParams } from "expo-router"
 import { useEffect, useMemo, useState } from "react"
-import SuggestCatalogModal, {
-  type CatalogBrandOption,
-} from "@/components/SuggestCatalogModal"
 import { useAuth } from "@/context/AuthContext"
 import {
   Alert,
@@ -92,11 +88,6 @@ const isSignedIn = Boolean(user)
   const [selectedFlavors, setSelectedFlavors] = useState<SelectedFlavor[]>([])
   const [showFlavorPicker, setShowFlavorPicker] = useState(false)
 
-  const [
-  showCatalogSubmission,
-  setShowCatalogSubmission,
-] = useState(false)
-
 
   const [search, setSearch] = useState("")
   const [mixName, setMixName] = useState("")
@@ -107,21 +98,11 @@ const isSignedIn = Boolean(user)
   const editingMix = editMixId ? getMixById(editMixId) : undefined
   const isEditing = Boolean(editingMix)
 
-  const totalPercentage = useMemo(
-    () =>
-      selectedFlavors.reduce(
-        (total, item) => total + item.percentage,
-        0
-      ),
-    [selectedFlavors]
-  )
-
-  const remainingPercentage = 100 - totalPercentage
-
+  // Percentages are kept internally only for backwards compatibility with
+  // the existing MixContext/database shape. They are no longer shown to users.
   const isValidMix =
     selectedFlavors.length >= 2 &&
     selectedFlavors.length <= 4 &&
-    totalPercentage === 100 &&
     mixName.trim().length > 0
 
     useEffect(() => {
@@ -297,37 +278,6 @@ const smartSuggestions = useMemo(() => {
   }, [databaseFlavors, search, selectedFlavors])
 
 
-  const availableBrands =
-  useMemo<CatalogBrandOption[]>(() => {
-    const brandMap = new Map<
-      string,
-      CatalogBrandOption
-    >()
-
-    databaseFlavors.forEach((flavor) => {
-      const brandId = flavor.brandId
-      const brandName =
-        getFlavorBrandName(flavor)
-
-      if (!brandId || !brandName) {
-        return
-      }
-
-      if (!brandMap.has(brandId)) {
-        brandMap.set(brandId, {
-          id: brandId,
-          name: brandName,
-        })
-      }
-    })
-
-    return Array.from(
-      brandMap.values()
-    ).sort((a, b) =>
-      a.name.localeCompare(b.name)
-    )
-  }, [databaseFlavors])
-
   /*
    * Restore an existing mix when this screen is opened in edit mode.
    * The flavorId route parameter is intentionally ignored while editing.
@@ -369,7 +319,7 @@ const smartSuggestions = useMemo(() => {
   }, [databaseFlavors, editingMix, getFlavorById])
 
   /*
-   * When the user taps "Create a mix" from a Flavor Detail page,
+   * When the user starts a combination from a Flavor Detail page,
    * automatically begin the new mix with that flavor selected.
    */
   useEffect(() => {
@@ -404,7 +354,7 @@ const smartSuggestions = useMemo(() => {
             ...current,
             {
               flavor: requestedFlavor,
-              percentage: current.length === 0 ? 50 : 0,
+              percentage: 100,
             },
           ]
         })
@@ -435,7 +385,7 @@ function goToSignIn() {
 
 function showSignInRequiredAlert() {
   const message =
-    "Mixes cannot be saved unless you are signed in. Sign in before building your mix so you do not lose your work."
+    "Flavor combinations can only be saved when you are signed in. Sign in before creating one so you do not lose your selections."
 
   if (Platform.OS === "web") {
     const shouldSignIn = window.confirm(
@@ -475,21 +425,18 @@ function openFlavorPicker() {
   setShowFlavorPicker(true)
 }
 
-function openCatalogSubmission() {
-  if (!user) {
-    showSignInRequiredAlert()
-    return
+
+  function rebalanceForStorage(items: SelectedFlavor[]) {
+    if (items.length === 0) return []
+
+    const basePercentage = Math.floor(100 / items.length)
+    const remainder = 100 - basePercentage * items.length
+
+    return items.map((item, index) => ({
+      ...item,
+      percentage: basePercentage + (index === 0 ? remainder : 0),
+    }))
   }
-
-  setShowFlavorPicker(false)
-  setShowCatalogSubmission(true)
-}
-
-function closeCatalogSubmission() {
-  setShowCatalogSubmission(false)
-  setSearch("")
-}
-
 
   function addFlavor(flavor: Flavor) {
   if (!user) {
@@ -506,42 +453,10 @@ function closeCatalogSubmission() {
         return current
       }
 
-      const currentTotal = current.reduce(
-        (total, item) => total + item.percentage,
-        0
-      )
-      const remaining = Math.max(0, 100 - currentTotal)
-
-      if (current.length === 0) {
-        return [{ flavor, percentage: 100 }]
-      }
-
-      if (remaining > 0) {
-        return [
-          ...current,
-          {
-            flavor,
-            percentage: remaining,
-          },
-        ]
-      }
-
-      // If the current blend already totals 100%, rebalance all flavors
-      // so the newly selected flavor immediately receives a usable amount.
-      const nextCount = current.length + 1
-      const basePercentage = Math.floor(100 / nextCount)
-      const remainder = 100 - basePercentage * nextCount
-
-      return [
+      return rebalanceForStorage([
         ...current,
-        {
-          flavor,
-          percentage: 0,
-        },
-      ].map((item, index) => ({
-        ...item,
-        percentage: basePercentage + (index === 0 ? remainder : 0),
-      }))
+        { flavor, percentage: 0 },
+      ])
     })
 
     setShowFlavorPicker(false)
@@ -550,36 +465,9 @@ function closeCatalogSubmission() {
 
   function removeFlavor(flavorId: string) {
     setSelectedFlavors((current) =>
-      current.filter((item) => item.flavor.id !== flavorId)
-    )
-  }
-
-  function updatePercentage(flavorId: string, percentage: number) {
-    setSelectedFlavors((current) =>
-      current.map((item) =>
-        item.flavor.id === flavorId
-          ? {
-              ...item,
-              percentage: Math.round(percentage),
-            }
-          : item
+      rebalanceForStorage(
+        current.filter((item) => item.flavor.id !== flavorId)
       )
-    )
-  }
-
-  function distributeEvenly() {
-    if (selectedFlavors.length === 0) {
-      return
-    }
-
-    const basePercentage = Math.floor(100 / selectedFlavors.length)
-    const remainder = 100 - basePercentage * selectedFlavors.length
-
-    setSelectedFlavors((current) =>
-      current.map((item, index) => ({
-        ...item,
-        percentage: basePercentage + (index === 0 ? remainder : 0),
-      }))
     )
   }
 
@@ -603,23 +491,15 @@ function closeCatalogSubmission() {
     if (selectedFlavors.length < 2 || selectedFlavors.length > 4) {
       Alert.alert(
         "Choose More Flavors",
-        "A mix must contain between 2 and 4 flavors."
-      )
-      return
-    }
-
-    if (totalPercentage !== 100) {
-      Alert.alert(
-        "Check Percentages",
-        "Your flavor percentages must total exactly 100%."
+        "A flavor combination must contain between 2 and 4 flavors."
       )
       return
     }
 
     if (!mixName.trim()) {
       Alert.alert(
-        "Mix Name Required",
-        "Please enter a name for your mix."
+        "Name Required",
+        "Please enter a name for your flavor combination."
       )
       return
     }
@@ -668,8 +548,8 @@ function closeCatalogSubmission() {
   console.error("Could not save mix:", error)
 
   Alert.alert(
-    "Could Not Save Mix",
-    "Something went wrong while saving your mix."
+    "Could Not Save Combination",
+    "Something went wrong while saving your flavor combination."
   )
 } finally {
   setIsSaving(false)
@@ -709,11 +589,11 @@ function closeCatalogSubmission() {
           </View>
 
           <Text style={styles.heroTitle}>
-            {isEditing ? "Refine your mix" : "Build your perfect blend"}
+            {isEditing ? "Refine your combination" : "Create a flavor combination"}
           </Text>
 
           <Text style={styles.heroSubtitle}>
-            Combine 2 to 4 flavors and balance the percentages until your blend reaches 100%.
+            Choose 2 to 4 flavors that you enjoy together and save the combination to your collection.
           </Text>
 
           <View style={styles.heroSteps}>
@@ -730,7 +610,7 @@ function closeCatalogSubmission() {
               <View style={styles.heroStepNumber}>
                 <Text style={styles.heroStepNumberText}>2</Text>
               </View>
-              <Text style={styles.heroStepText}>Set amounts</Text>
+              <Text style={styles.heroStepText}>Review pairing</Text>
             </View>
 
             <View style={styles.heroStepDivider} />
@@ -739,7 +619,7 @@ function closeCatalogSubmission() {
               <View style={styles.heroStepNumber}>
                 <Text style={styles.heroStepNumberText}>3</Text>
               </View>
-              <Text style={styles.heroStepText}>Save mix</Text>
+              <Text style={styles.heroStepText}>Save combination</Text>
             </View>
           </View>
         </View>
@@ -756,13 +636,13 @@ function closeCatalogSubmission() {
 
     <View style={styles.signInWarningContent}>
       <Text style={styles.signInWarningTitle}>
-        Sign in before building your mix
+        Sign in before creating a combination
       </Text>
 
       <Text style={styles.signInWarningText}>
-        Mixes cannot be saved unless you are
+        Flavor combinations can only be saved when you are
         signed in. Sign in now so you do not
-        spend time creating a mix that cannot
+        spend time creating a combination that cannot
         be saved.
       </Text>
 
@@ -801,84 +681,9 @@ function closeCatalogSubmission() {
           </View>
         ) : null}
 
-        <View style={styles.progressCard}>
-          <View style={styles.progressHeader}>
-            <View>
-              <Text style={styles.progressLabel}>Blend Total</Text>
-              <Text
-                style={[
-                  styles.progressValue,
-                  totalPercentage > 100 && styles.progressValueInvalid,
-                ]}
-              >
-                {totalPercentage}%
-              </Text>
-            </View>
-
-            <View
-              style={[
-                styles.statusBadge,
-                totalPercentage === 100
-                  ? styles.statusBadgeComplete
-                  : styles.statusBadgeIncomplete,
-              ]}
-            >
-              <Ionicons
-                name={
-                  totalPercentage === 100
-                    ? "checkmark-circle"
-                    : "time-outline"
-                }
-                size={15}
-                color={
-                  totalPercentage === 100
-                    ? theme.success
-                    : theme.primaryDark
-                }
-              />
-
-              <Text
-                style={[
-                  styles.statusText,
-                  totalPercentage === 100
-                    ? styles.statusTextComplete
-                    : styles.statusTextIncomplete,
-                ]}
-              >
-                {totalPercentage === 100
-                  ? "Ready"
-                  : totalPercentage > 100
-                    ? `${totalPercentage - 100}% over`
-                    : `${remainingPercentage}% remaining`}
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.progressTrack}>
-            <View
-              style={[
-                styles.progressFill,
-                {
-                  width: `${Math.min(totalPercentage, 100)}%`,
-                },
-                totalPercentage > 100 && styles.progressFillInvalid,
-              ]}
-            />
-          </View>
-
-          <Text style={styles.progressHint}>
-            Add between 2 and 4 flavors. Your percentages must equal 100%.
-          </Text>
-        </View>
-
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Selected Flavors</Text>
 
-          {selectedFlavors.length > 1 ? (
-            <TouchableOpacity onPress={distributeEvenly}>
-              <Text style={styles.sectionAction}>Split evenly</Text>
-            </TouchableOpacity>
-          ) : null}
         </View>
 
         {selectedFlavors.length === 0 ? (
@@ -902,9 +707,6 @@ function closeCatalogSubmission() {
               <SelectedFlavorCard
                 key={item.flavor.id}
                 item={item}
-                onPercentageChange={(value) =>
-                  updatePercentage(item.flavor.id, value)
-                }
                 onRemove={() => removeFlavor(item.flavor.id)}
                 theme={theme}
                 styles={styles}
@@ -923,132 +725,12 @@ function closeCatalogSubmission() {
           </TouchableOpacity>
         ) : null}
 
-        {selectedFlavors.length > 0 &&
-selectedFlavors.length < 4 ? (
-  <View style={styles.suggestionSection}>
-    <View style={styles.suggestionHeader}>
-      <View>
-        <Text style={styles.suggestionEyebrow}>
-          SMART SUGGESTIONS
-        </Text>
-
-        <Text style={styles.suggestionTitle}>
-          Popular additions
-        </Text>
-      </View>
-
-      <View style={styles.suggestionBadge}>
-        <Ionicons
-          name="sparkles"
-          size={14}
-          color={theme.primary}
-        />
-
-        <Text style={styles.suggestionBadgeText}>
-          Community
-        </Text>
-      </View>
-    </View>
-
-    {isLoadingSuggestions ? (
-      <View style={styles.suggestionMessageCard}>
-        <Ionicons
-          name="hourglass-outline"
-          size={20}
-          color={theme.primary}
-        />
-
-        <Text style={styles.suggestionMessageText}>
-          Finding flavors that work with your selection...
-        </Text>
-      </View>
-    ) : smartSuggestions.length > 0 ? (
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.suggestionList}
-      >
-        {smartSuggestions.map((suggestion) => (
-          <TouchableOpacity
-            key={suggestion.flavor.id}
-            style={styles.suggestionCard}
-            activeOpacity={0.85}
-            onPress={() =>
-              addFlavor(suggestion.flavor)
-            }
-          >
-            <Image
-              source={{
-                uri: suggestion.flavor.imageUrl,
-              }}
-              style={styles.suggestionImage}
-            />
-
-            <View style={styles.suggestionContent}>
-              <Text
-                style={styles.suggestionFlavorName}
-                numberOfLines={1}
-              >
-                {suggestion.flavor.name}
-              </Text>
-
-              <Text
-                style={styles.suggestionBrand}
-                numberOfLines={1}
-              >
-                {getFlavorBrandName(
-                  suggestion.flavor
-                )}
-              </Text>
-
-              <Text style={styles.suggestionReason}>
-                Used in {suggestion.mixCount}{" "}
-                {suggestion.mixCount === 1
-                  ? "community mix"
-                  : "community mixes"}
-              </Text>
-            </View>
-
-            <View style={styles.suggestionAddButton}>
-              <Ionicons
-                name="add"
-                size={18}
-                color="#FFFFFF"
-              />
-            </View>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
-    ) : (
-      <View style={styles.suggestionMessageCard}>
-        <Ionicons
-          name="analytics-outline"
-          size={21}
-          color={theme.primary}
-        />
-
-        <View style={styles.suggestionMessageContent}>
-          <Text style={styles.suggestionMessageTitle}>
-            Suggestions are still learning
-          </Text>
-
-          <Text style={styles.suggestionMessageText}>
-            Recommendations will appear as the
-            community publishes more mixes using these
-            flavors.
-          </Text>
-        </View>
-      </View>
-    )}
-  </View>
-) : null}
-
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Mix Details</Text>
+          <Text style={styles.sectionTitle}>Combination Details</Text>
         </View>
 
         <View style={styles.formCard}>
-          <Text style={styles.inputLabel}>Mix name</Text>
+          <Text style={styles.inputLabel}>Combination name</Text>
 
           <TextInput
             value={mixName}
@@ -1068,7 +750,7 @@ selectedFlavors.length < 4 ? (
             value={notes}
             onChangeText={setNotes}
             style={[styles.textInput, styles.notesInput]}
-            placeholder="Describe the taste, strength, or preparation..."
+            placeholder="Add personal notes about this flavor combination..."
             placeholderTextColor={theme.muted}
             multiline
             maxLength={200}
@@ -1090,7 +772,7 @@ selectedFlavors.length < 4 ? (
 
                 <View style={styles.previewTitleContainer}>
                   <Text style={styles.previewTitle}>
-                    {mixName.trim() || "Untitled Mix"}
+                    {mixName.trim() || "Untitled Combination"}
                   </Text>
 
                   <Text style={styles.previewSubtitle}>
@@ -1116,17 +798,9 @@ selectedFlavors.length < 4 ? (
                         <Text style={styles.previewFlavorName}>
                           {item.flavor.name}
                         </Text>
-                        {getFlavorBrandName(item.flavor) ? (
-                        <Text style={styles.previewFlavorBrand}>
-                          {getFlavorBrandName(item.flavor)}
-                        </Text>
-                      ) : null}
                       </View>
                     </View>
 
-                    <Text style={styles.previewPercentage}>
-                      {item.percentage}%
-                    </Text>
                   </View>
                 ))}
               </View>
@@ -1171,12 +845,12 @@ selectedFlavors.length < 4 ? (
 
   <Text style={styles.saveButtonText}>
     {!isSignedIn
-      ? "Sign In to Save Mix"
+      ? "Sign In to Save"
       : isSaving
         ? "Saving..."
         : isEditing
-          ? "Update Mix"
-          : "Save Mix"}
+          ? "Update Combination"
+          : "Save Combination"}
   </Text>
 </TouchableOpacity>
       </ScrollView>
@@ -1192,25 +866,8 @@ selectedFlavors.length < 4 ? (
     setSearch("")
   }}
   onSelect={addFlavor}
-  onSuggestFlavor={openCatalogSubmission}
   theme={theme}
   styles={styles}
-/>
-
-<SuggestCatalogModal
-  visible={showCatalogSubmission}
-  brands={availableBrands}
-  initialFlavorName={search}
-  theme={theme}
-  onClose={closeCatalogSubmission}
-  onSubmitted={() => {
-    closeCatalogSubmission()
-
-    Alert.alert(
-      "Submission Received",
-      "Your brand and flavor were submitted for review. You will receive a notification after an admin reviews them."
-    )
-  }}
 />
     </SafeAreaView>
   )
@@ -1218,7 +875,6 @@ selectedFlavors.length < 4 ? (
 
 type SelectedFlavorCardProps = {
   item: SelectedFlavor
-  onPercentageChange: (value: number) => void
   onRemove: () => void
   theme: AppTheme
   styles: ReturnType<typeof getStyles>
@@ -1226,7 +882,6 @@ type SelectedFlavorCardProps = {
 
 function SelectedFlavorCard({
   item,
-  onPercentageChange,
   onRemove,
   theme,
   styles,
@@ -1244,11 +899,6 @@ function SelectedFlavorCard({
             {item.flavor.name}
           </Text>
 
-          {getFlavorBrandName(item.flavor) ? (
-            <Text style={styles.selectedFlavorBrand}>
-              {getFlavorBrandName(item.flavor)}
-            </Text>
-          ) : null}
         </View>
 
         <TouchableOpacity
@@ -1262,34 +912,6 @@ function SelectedFlavorCard({
           />
         </TouchableOpacity>
       </View>
-
-      <View style={styles.sliderHeader}>
-        <Text style={styles.sliderLabel}>Blend amount</Text>
-
-        <View style={styles.percentageBadge}>
-          <Text style={styles.percentageBadgeText}>
-            {item.percentage}%
-          </Text>
-        </View>
-      </View>
-
-      <Slider
-        style={styles.slider}
-        minimumValue={0}
-        maximumValue={100}
-        step={5}
-        value={item.percentage}
-        onValueChange={onPercentageChange}
-        minimumTrackTintColor={theme.primary}
-        maximumTrackTintColor={theme.divider}
-        thumbTintColor={theme.primary}
-      />
-
-      <View style={styles.sliderScale}>
-        <Text style={styles.sliderScaleText}>0%</Text>
-        <Text style={styles.sliderScaleText}>50%</Text>
-        <Text style={styles.sliderScaleText}>100%</Text>
-      </View>
     </View>
   )
 }
@@ -1302,7 +924,6 @@ type FlavorPickerModalProps = {
   selectedCount: number
   onClose: () => void
   onSelect: (flavor: Flavor) => void
-  onSuggestFlavor: () => void
   theme: AppTheme
   styles: ReturnType<typeof getStyles>
 }
@@ -1315,7 +936,6 @@ function FlavorPickerModal({
   selectedCount,
   onClose,
   onSelect,
-  onSuggestFlavor,
   theme,
   styles,
 }: FlavorPickerModalProps) {
@@ -1351,7 +971,7 @@ function FlavorPickerModal({
             value={search}
             onChangeText={onSearchChange}
             style={styles.modalSearchInput}
-            placeholder="Search flavors or brands..."
+            placeholder="Search flavors..."
             placeholderTextColor={theme.muted}
             autoCapitalize="none"
             autoCorrect={false}
@@ -1389,11 +1009,6 @@ function FlavorPickerModal({
 
               <View style={styles.modalFlavorContent}>
                 <Text style={styles.modalFlavorName}>{item.name}</Text>
-                {getFlavorBrandName(item) ? (
-                  <Text style={styles.modalFlavorBrand}>
-                    {getFlavorBrandName(item)}
-                  </Text>
-                ) : null}
 
                 {(item.categories ?? []).length > 0 ? (
                   <View style={styles.modalTagRow}>
@@ -1414,95 +1029,14 @@ function FlavorPickerModal({
             </TouchableOpacity>
           )}
          ListEmptyComponent={
-  <View style={styles.modalEmptyContainer}>
-    <View style={styles.modalEmptyIcon}>
-      <Ionicons
-        name="search-outline"
-        size={34}
-        color={theme.primary}
-      />
-    </View>
-
-    <Text style={styles.modalEmptyTitle}>
-      No flavors found
-    </Text>
-
-    <Text style={styles.modalEmptyText}>
-      This brand or flavor may not be in the
-      KloudIt catalog yet.
-    </Text>
-
-    <TouchableOpacity
-      style={styles.suggestFlavorButton}
-      activeOpacity={0.85}
-      onPress={onSuggestFlavor}
-    >
-      <Ionicons
-        name="add-circle-outline"
-        size={20}
-        color="#FFFFFF"
-      />
-
-      <Text
-        style={styles.suggestFlavorButtonText}
-      >
-        Suggest New Brand & Flavor
-      </Text>
-    </TouchableOpacity>
-  </View>
-}
-
-ListFooterComponent={
-  flavors.length > 0 ? (
-    <TouchableOpacity
-      style={
-        styles.catalogSuggestionFooter
-      }
-      activeOpacity={0.85}
-      onPress={onSuggestFlavor}
-    >
-      <View
-        style={
-          styles.catalogSuggestionFooterIcon
+          <View style={styles.modalEmptyContainer}>
+            <View style={styles.modalEmptyIcon}>
+              <Ionicons name="search-outline" size={34} color={theme.primary} />
+            </View>
+            <Text style={styles.modalEmptyTitle}>No flavors found</Text>
+            <Text style={styles.modalEmptyText}>Try another search term.</Text>
+          </View>
         }
-      >
-        <Ionicons
-          name="add"
-          size={20}
-          color={theme.primary}
-        />
-      </View>
-
-      <View
-        style={
-          styles.catalogSuggestionFooterContent
-        }
-      >
-        <Text
-          style={
-            styles.catalogSuggestionFooterTitle
-          }
-        >
-          Can’t find what you need?
-        </Text>
-
-        <Text
-          style={
-            styles.catalogSuggestionFooterText
-          }
-        >
-          Suggest a missing brand and flavor.
-        </Text>
-      </View>
-
-      <Ionicons
-        name="chevron-forward"
-        size={19}
-        color={theme.muted}
-      />
-    </TouchableOpacity>
-  ) : null
-}
         />
       </SafeAreaView>
     </Modal>

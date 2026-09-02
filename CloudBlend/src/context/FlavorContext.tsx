@@ -7,12 +7,14 @@ import {
   useMemo,
   useState,
 } from "react"
+
+import { useAuth } from "@/context/AuthContext"
+
 import {
   fetchApprovedFlavorImages,
   fetchUserFlavorImageSubmissions,
   submitFlavorImage,
 } from "@/services/flavorImageService"
-import { useAuth } from "@/context/AuthContext"
 
 import {
   deleteFlavorRating,
@@ -53,21 +55,46 @@ type FlavorContextValue = {
   error: string | null
 
   refreshFlavors: () => Promise<void>
-  getFlavorById: (flavorId: string) => Flavor | undefined
-  loadFlavorById: (flavorId: string) => Promise<Flavor | null>
+
+  getFlavorById: (
+    flavorId: string
+  ) => Flavor | undefined
+
+  loadFlavorById: (
+    flavorId: string
+  ) => Promise<Flavor | null>
+
   loadFlavorRatings: (
     flavorId: string
   ) => Promise<FlavorRating[]>
-  
 
-  isFlavorFavorite: (flavorId: string) => boolean
-  toggleFavoriteFlavor: (flavorId: string) => Promise<void>
+  isFlavorFavorite: (
+    flavorId: string
+  ) => boolean
+
+  toggleFavoriteFlavor: (
+    flavorId: string
+  ) => Promise<void>
 
   submitFlavorRating: (
     input: Omit<CreateFlavorRatingInput, "userId">
   ) => Promise<void>
 
-  removeFlavorRating: (flavorId: string) => Promise<void>
+  removeFlavorRating: (
+    flavorId: string
+  ) => Promise<void>
+
+  loadApprovedFlavorImages: (
+    flavorId: string
+  ) => Promise<FlavorImageSubmission[]>
+
+  loadMyFlavorImageSubmissions: (
+    flavorId?: string
+  ) => Promise<FlavorImageSubmission[]>
+
+  submitFlavorPhoto: (
+    input: SubmitFlavorImageInput
+  ) => Promise<FlavorImageSubmission>
 }
 
 const FlavorContext = createContext<
@@ -84,13 +111,18 @@ export function FlavorProvider({
   const { user } = useAuth()
 
   const [brands, setBrands] = useState<Brand[]>([])
-  const [brandStatistics, setBrandStatistics] = useState<
-    BrandStatistics[]
-  >([])
+
+  const [
+    brandStatistics,
+    setBrandStatistics,
+  ] = useState<BrandStatistics[]>([])
+
   const [flavors, setFlavors] = useState<Flavor[]>([])
-  const [favoriteFlavorIds, setFavoriteFlavorIds] = useState<
-    string[]
-  >([])
+
+  const [
+    favoriteFlavorIds,
+    setFavoriteFlavorIds,
+  ] = useState<string[]>([])
 
   const [isLoading, setIsLoading] = useState(true)
   const [isRefreshing, setIsRefreshing] = useState(false)
@@ -131,7 +163,11 @@ export function FlavorProvider({
             ? loadError.message
             : "Could not load the flavor catalog."
 
-        console.error("Could not load flavor catalog:", loadError)
+        console.error(
+          "Could not load flavor catalog:",
+          loadError
+        )
+
         setError(message)
       } finally {
         setIsLoading(false)
@@ -151,7 +187,9 @@ export function FlavorProvider({
 
   const getFlavorById = useCallback(
     (flavorId: string) =>
-      flavors.find((flavor) => flavor.id === flavorId),
+      flavors.find(
+        (flavor) => flavor.id === flavorId
+      ),
     [flavors]
   )
 
@@ -178,38 +216,38 @@ export function FlavorProvider({
   )
 
   const loadApprovedFlavorImages = useCallback(
-  async (flavorId: string) => {
-    return fetchApprovedFlavorImages(flavorId)
-  },
-  []
-)
+    async (flavorId: string) => {
+      return fetchApprovedFlavorImages(flavorId)
+    },
+    []
+  )
 
-const loadMyFlavorImageSubmissions = useCallback(
-  async (flavorId?: string) => {
-    if (!user) {
-      return []
-    }
+  const loadMyFlavorImageSubmissions = useCallback(
+    async (flavorId?: string) => {
+      if (!user) {
+        return []
+      }
 
-    return fetchUserFlavorImageSubmissions(
-      user.id,
-      flavorId
-    )
-  },
-  [user]
-)
-
-const submitFlavorPhoto = useCallback(
-  async (input: SubmitFlavorImageInput) => {
-    if (!user) {
-      throw new Error(
-        "You must be signed in to submit a photo."
+      return fetchUserFlavorImageSubmissions(
+        user.id,
+        flavorId
       )
-    }
+    },
+    [user]
+  )
 
-    return submitFlavorImage(input, user.id)
-  },
-  [user]
-)
+  const submitFlavorPhoto = useCallback(
+    async (input: SubmitFlavorImageInput) => {
+      if (!user) {
+        throw new Error(
+          "You must be signed in to submit a photo."
+        )
+      }
+
+      return submitFlavorImage(input, user.id)
+    },
+    [user]
+  )
 
   const isFlavorFavorite = useCallback(
     (flavorId: string) =>
@@ -230,7 +268,9 @@ const submitFlavorPhoto = useCallback(
 
       setFavoriteFlavorIds((currentIds) =>
         currentlyFavorite
-          ? currentIds.filter((id) => id !== flavorId)
+          ? currentIds.filter(
+              (id) => id !== flavorId
+            )
           : [...currentIds, flavorId]
       )
 
@@ -253,15 +293,23 @@ const submitFlavorPhoto = useCallback(
 
       try {
         if (currentlyFavorite) {
-          await unfavoriteFlavor(flavorId, user.id)
+          await unfavoriteFlavor(
+            flavorId,
+            user.id
+          )
         } else {
-          await favoriteFlavor(flavorId, user.id)
+          await favoriteFlavor(
+            flavorId,
+            user.id
+          )
         }
       } catch (favoriteError) {
         setFavoriteFlavorIds((currentIds) =>
           currentlyFavorite
             ? [...currentIds, flavorId]
-            : currentIds.filter((id) => id !== flavorId)
+            : currentIds.filter(
+                (id) => id !== flavorId
+              )
         )
 
         setFlavors((currentFlavors) =>
@@ -289,7 +337,10 @@ const submitFlavorPhoto = useCallback(
 
   const submitFlavorRating = useCallback(
     async (
-      input: Omit<CreateFlavorRatingInput, "userId">
+      input: Omit<
+        CreateFlavorRatingInput,
+        "userId"
+      >
     ) => {
       if (!user) {
         throw new Error(
@@ -302,9 +353,8 @@ const submitFlavorPhoto = useCallback(
         userId: user.id,
       })
 
-      const updatedFlavor = await fetchFlavorById(
-        input.flavorId
-      )
+      const updatedFlavor =
+        await fetchFlavorById(input.flavorId)
 
       if (updatedFlavor) {
         setFlavors((currentFlavors) =>
@@ -327,9 +377,13 @@ const submitFlavorPhoto = useCallback(
         )
       }
 
-      await deleteFlavorRating(flavorId, user.id)
+      await deleteFlavorRating(
+        flavorId,
+        user.id
+      )
 
-      const updatedFlavor = await fetchFlavorById(flavorId)
+      const updatedFlavor =
+        await fetchFlavorById(flavorId)
 
       if (updatedFlavor) {
         setFlavors((currentFlavors) =>
@@ -345,36 +399,51 @@ const submitFlavorPhoto = useCallback(
   )
 
   const topFlavors = useMemo(() => {
-  return [...flavors]
-    .sort((a, b) => {
-      if (b.averageRating !== a.averageRating) {
-        return b.averageRating - a.averageRating
-      }
+    return [...flavors]
+      .sort((a, b) => {
+        if (
+          b.averageRating !== a.averageRating
+        ) {
+          return (
+            b.averageRating - a.averageRating
+          )
+        }
 
-      if (b.ratingCount !== a.ratingCount) {
-        return b.ratingCount - a.ratingCount
-      }
+        if (b.ratingCount !== a.ratingCount) {
+          return b.ratingCount - a.ratingCount
+        }
 
-      if (b.favoriteCount !== a.favoriteCount) {
-        return b.favoriteCount - a.favoriteCount
-      }
+        if (
+          b.favoriteCount !== a.favoriteCount
+        ) {
+          return (
+            b.favoriteCount - a.favoriteCount
+          )
+        }
 
-      return a.name.localeCompare(b.name)
-    })
-    .slice(0, 10)
-}, [flavors])
-
-
+        return a.name.localeCompare(b.name)
+      })
+      .slice(0, 10)
+  }, [flavors])
 
   const trendingFlavors = useMemo(() => {
     return [...flavors]
       .sort((a, b) => {
-        if (b.publicMixCount !== a.publicMixCount) {
-          return b.publicMixCount - a.publicMixCount
+        if (
+          b.publicMixCount !== a.publicMixCount
+        ) {
+          return (
+            b.publicMixCount -
+            a.publicMixCount
+          )
         }
 
-        if (b.favoriteCount !== a.favoriteCount) {
-          return b.favoriteCount - a.favoriteCount
+        if (
+          b.favoriteCount !== a.favoriteCount
+        ) {
+          return (
+            b.favoriteCount - a.favoriteCount
+          )
         }
 
         return b.ratingCount - a.ratingCount
@@ -382,11 +451,18 @@ const submitFlavorPhoto = useCallback(
       .slice(0, 10)
   }, [flavors])
 
+  // Kept for compatibility with any administrative/catalog
+  // screens that may still use brand data. The refactored
+  // consumer-facing screens do not need to surface this.
   const topBrands = useMemo(() => {
     return [...brandStatistics]
       .sort((a, b) => {
-        if (b.averageRating !== a.averageRating) {
-          return b.averageRating - a.averageRating
+        if (
+          b.averageRating !== a.averageRating
+        ) {
+          return (
+            b.averageRating - a.averageRating
+          )
         }
 
         return b.ratingCount - a.ratingCount
@@ -420,10 +496,10 @@ const submitFlavorPhoto = useCallback(
 
       submitFlavorRating,
       removeFlavorRating,
-      loadApprovedFlavorImages,
-loadMyFlavorImageSubmissions,
-submitFlavorPhoto,
 
+      loadApprovedFlavorImages,
+      loadMyFlavorImageSubmissions,
+      submitFlavorPhoto,
     }),
     [
       brands,
@@ -444,6 +520,9 @@ submitFlavorPhoto,
       toggleFavoriteFlavor,
       submitFlavorRating,
       removeFlavorRating,
+      loadApprovedFlavorImages,
+      loadMyFlavorImageSubmissions,
+      submitFlavorPhoto,
     ]
   )
 
@@ -455,17 +534,6 @@ submitFlavorPhoto,
 }
 
 export function useFlavors(): FlavorContextValue {
-  loadApprovedFlavorImages: (
-  flavorId: string
-) => Promise<FlavorImageSubmission[]>
-
-loadMyFlavorImageSubmissions: (
-  flavorId?: string
-) => Promise<FlavorImageSubmission[]>
-
-submitFlavorPhoto: (
-  input: SubmitFlavorImageInput
-) => Promise<FlavorImageSubmission>
   const context = useContext(FlavorContext)
 
   if (!context) {

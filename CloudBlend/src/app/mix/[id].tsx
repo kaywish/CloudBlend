@@ -232,11 +232,11 @@ export default function MixDetailScreen() {
           />
 
           <Text style={styles.notFoundTitle}>
-            Mix not found
+            Combination not found
           </Text>
 
           <Text style={styles.notFoundText}>
-            This mix may have been removed or made private.
+            This combination may have been removed or made private.
           </Text>
 
           <TouchableOpacity
@@ -295,7 +295,7 @@ export default function MixDetailScreen() {
     try {
       await Share.share({
         title: `Check out ${mix.name}`,
-        message: `Check out the mix "${mix.name}" on KloudIt.\n\nDownload KloudIt to discover flavors and create your own mixes:\n\n${appStoreUrl}`,
+        message: `Check out the flavor combination "${mix.name}" on KloudIt.\n\nDownload KloudIt to discover flavors and save your own combinations:\n\n${appStoreUrl}`,
         url: appStoreUrl,
       })
     } catch (error) {
@@ -306,7 +306,7 @@ export default function MixDetailScreen() {
 
       showMessage(
         "Could Not Share",
-        "Something went wrong while sharing this mix."
+        "Something went wrong while sharing this combination."
       )
     }
   }
@@ -346,8 +346,8 @@ async function saveCommunityMixCopy() {
     })
 
     showMessage(
-      "Mix Saved",
-      "This community mix was added to My Mixes and will remain private."
+      "Combination Saved",
+      "This community combination was added to your saved combinations and will remain private."
     )
 
     router.replace({
@@ -365,9 +365,9 @@ async function saveCommunityMixCopy() {
     const message =
       error instanceof Error
         ? error.message
-        : "Something went wrong while saving this mix."
+        : "Something went wrong while saving this combination."
 
-    showMessage("Could Not Save Mix", message)
+    showMessage("Could Not Save Combination", message)
   } finally {
     setIsSavingCopy(false)
   }
@@ -434,7 +434,7 @@ useEffect(() => {
     if (!user) {
       if (Platform.OS === "web") {
         const shouldSignIn = window.confirm(
-          "Sign in to rate and review community mixes."
+          "Sign in to rate and review community combinations."
         )
 
         if (shouldSignIn) {
@@ -446,7 +446,7 @@ useEffect(() => {
 
       Alert.alert(
         "Sign In Required",
-        "Sign in to rate and review community mixes.",
+        "Sign in to rate and review community combinations.",
         [
           {
             text: "Cancel",
@@ -464,16 +464,16 @@ useEffect(() => {
 
     if (mix.userId === user.id) {
       showMessage(
-        "Your Mix",
-        "You can't rate your own mix."
+        "Your Combination",
+        "You can't rate your own combination."
       )
       return
     }
 
     if (mix.visibility !== "public") {
       showMessage(
-        "Public Mixes Only",
-        "Only public community mixes can be rated."
+        "Public Combinations Only",
+        "Only public community combinations can be rated."
       )
       return
     }
@@ -630,7 +630,7 @@ useEffect(() => {
 
       showMessage(
         "Could Not Delete",
-        "Something went wrong while deleting this mix."
+        "Something went wrong while deleting this combination."
       )
     } finally {
       setIsDeleting(false)
@@ -643,7 +643,7 @@ useEffect(() => {
     }
 
     const message =
-      `Are you sure you want to delete "${mix.name}"?`
+      `Are you sure you want to delete "${mix.name}"? This cannot be undone.`
 
     if (Platform.OS === "web") {
       const confirmed = window.confirm(message)
@@ -655,7 +655,7 @@ useEffect(() => {
       return
     }
 
-    Alert.alert("Delete Mix", message, [
+    Alert.alert("Delete Combination", message, [
       {
         text: "Cancel",
         style: "cancel",
@@ -694,13 +694,13 @@ useEffect(() => {
 
       const successMessage =
         newVisibility === "public"
-          ? "Your mix is now visible to the KloudIt community."
-          : "Your mix is now private."
+          ? "Your combination is now visible to the KloudIt community."
+          : "Your combination is now private."
 
       showMessage(
         newVisibility === "public"
-          ? "Mix Published"
-          : "Mix Made Private",
+          ? "Combination Published"
+          : "Combination Made Private",
         successMessage
       )
     } catch (error) {
@@ -715,7 +715,7 @@ useEffect(() => {
           : "Something went wrong. Please try again."
 
       showMessage(
-        "Could Not Update Mix",
+        "Could Not Update Combination",
         message
       )
     } finally {
@@ -736,12 +736,12 @@ useEffect(() => {
       mix.visibility !== "public"
 
     const title = makingPublic
-      ? "Publish Mix"
-      : "Make Mix Private"
+      ? "Publish Combination"
+      : "Make Combination Private"
 
     const message = makingPublic
-      ? "This mix will be visible to everyone on KloudIt."
-      : "This mix will only be visible to you."
+      ? "This combination will be visible to everyone on KloudIt."
+      : "This combination will only be visible to you."
 
     if (Platform.OS === "web") {
       const confirmed = window.confirm(
@@ -793,7 +793,7 @@ useEffect(() => {
           </TouchableOpacity>
 
           <Text style={styles.headerTitle}>
-            Mix Details
+            Combination Details
           </Text>
 
           {isOwner ? (
@@ -908,44 +908,16 @@ useEffect(() => {
               <Text style={styles.heroStatValue}>
                 {mix.ingredients.length}
               </Text>
-
               <Text style={styles.heroStatLabel}>
-                {mix.ingredients.length === 1
-                  ? "Flavor"
-                  : "Flavors"}
+                {mix.ingredients.length === 1 ? "Flavor" : "Flavors"}
               </Text>
             </View>
 
             <View style={styles.heroStatDivider} />
 
             <View style={styles.heroStatItem}>
-              <Text style={styles.heroStatValue}>
-                {totalPercentage}%
-              </Text>
-
-              <Text style={styles.heroStatLabel}>
-                Blend total
-              </Text>
-            </View>
-
-            <View style={styles.heroStatDivider} />
-
-            <View style={styles.heroStatItem}>
-              <Ionicons
-                name={
-                  totalPercentage === 100
-                    ? "checkmark-circle"
-                    : "alert-circle"
-                }
-                size={22}
-                color="#FFFFFF"
-              />
-
-              <Text style={styles.heroStatLabel}>
-                {totalPercentage === 100
-                  ? "Balanced"
-                  : "Review"}
-              </Text>
+              <Ionicons name="sparkles-outline" size={22} color="#FFFFFF" />
+              <Text style={styles.heroStatLabel}>Flavor pairing</Text>
             </View>
           </View>
 
@@ -962,13 +934,13 @@ useEffect(() => {
                   <Text
                     style={styles.savedPrivateTitle}
                   >
-                    Saved to My Mixes
+                    Saved to My Combinations
                   </Text>
 
                   <Text
                     style={styles.savedPrivateText}
                   >
-                    Community copies always remain private
+                    Saved copies always remain private
                   </Text>
                 </View>
               </View>
@@ -1001,7 +973,7 @@ useEffect(() => {
                     ? "Updating..."
                     : mix.visibility === "public"
                       ? "Make Private"
-                      : "Publish Mix"}
+                      : "Publish Combination"}
                 </Text>
               </TouchableOpacity>
             )
@@ -1015,7 +987,7 @@ useEffect(() => {
                 />
 
                 <Text style={styles.publicViewerText}>
-                  Community mix
+                  Community combination
                 </Text>
               </View>
 
@@ -1048,7 +1020,7 @@ useEffect(() => {
     ? "Saving..."
     : isLoadingPro
       ? "Checking Pro..."
-      : "Save Mix"}
+      : "Save Combination"}
 </Text>
 
               {!isLoadingPro && !hasPro ? (
@@ -1072,11 +1044,11 @@ useEffect(() => {
         <View style={styles.sectionHeader}>
           <View>
             <Text style={styles.sectionEyebrow}>
-              RECIPE
+              FLAVORS
             </Text>
 
             <Text style={styles.sectionTitle}>
-              Flavor Blend
+              Flavor Combination
             </Text>
           </View>
 
@@ -1140,13 +1112,6 @@ useEffect(() => {
                   </View>
                 </View>
 
-                <View style={styles.percentageBadge}>
-                  <Text
-                    style={styles.percentageText}
-                  >
-                    {ingredient.percentage}%
-                  </Text>
-                </View>
               </View>
             )
           )}
@@ -1184,63 +1149,6 @@ useEffect(() => {
           </>
         ) : null}
 
-        <View style={styles.sectionHeader}>
-          <View>
-            <Text style={styles.sectionEyebrow}>
-              PERCENTAGES
-            </Text>
-
-            <Text style={styles.sectionTitle}>
-              Blend Breakdown
-            </Text>
-          </View>
-        </View>
-
-        <View style={styles.breakdownCard}>
-          {mix.ingredients.map(
-            (ingredient, index) => (
-              <View
-                key={`${ingredient.flavorId}-breakdown-${index}`}
-                style={styles.breakdownItem}
-              >
-                <View style={styles.breakdownHeader}>
-                  <Text
-                    style={styles.breakdownName}
-                    numberOfLines={1}
-                  >
-                    {ingredient.flavorName}
-                  </Text>
-
-                  <Text
-                    style={
-                      styles.breakdownPercentage
-                    }
-                  >
-                    {ingredient.percentage}%
-                  </Text>
-                </View>
-
-                <View style={styles.progressTrack}>
-                  <View
-                    style={[
-                      styles.progressFill,
-                      {
-                        width: `${Math.min(
-                          Math.max(
-                            ingredient.percentage,
-                            0
-                          ),
-                          100
-                        )}%`,
-                      },
-                    ]}
-                  />
-                </View>
-              </View>
-            )
-          )}
-        </View>
-
         {mix.visibility === "public" ? (
           <>
             <View style={styles.sectionHeader}>
@@ -1272,7 +1180,7 @@ useEffect(() => {
                   <Text style={styles.rateMixButtonText}>
                     {myReview
                       ? "Edit Rating"
-                      : "Rate Mix"}
+                      : "Rate Combination"}
                   </Text>
                 </TouchableOpacity>
               ) : null}
@@ -1321,7 +1229,7 @@ useEffect(() => {
 
                 <Text style={styles.ratingSummaryText}>
                   {ratingCount === 0
-                    ? "Be the first community member to rate this mix."
+                    ? "Be the first community member to rate this combination."
                     : "Ratings are submitted by KloudIt community members."}
                 </Text>
 
@@ -1696,7 +1604,7 @@ useEffect(() => {
                 <Text style={styles.modalTitle}>
                   {myReview
                     ? "Update your review"
-                    : "Rate this mix"}
+                    : "Rate this combination"}
                 </Text>
 
                 <Text style={styles.modalSubtitle}>
@@ -1765,7 +1673,7 @@ useEffect(() => {
               style={styles.reviewInput}
               value={reviewText}
               onChangeText={setReviewText}
-              placeholder="What did you think about this mix?"
+              placeholder="What did you think about this flavor combination?"
               placeholderTextColor={
                 theme.textSecondary
               }
